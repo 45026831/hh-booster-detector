@@ -1,22 +1,22 @@
 // ==UserScript==
-// @name			Hentai Heroes++ League Booster Detector Add-on
-// @description		Adding detection of boosters to league.
-// @version			0.0.8
-// @match			https://www.hentaiheroes.com/*
-// @match			https://nutaku.haremheroes.com/*
-// @match			https://eroges.hentaiheroes.com/*
-// @match			https://thrix.hentaiheroes.com/*
-// @match			https://test.hentaiheroes.com/*
-// @run-at			document-end
-// @updateURL		https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
-// @downloadURL		https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
-// @grant			none
-// @author			45026831(Numbers)
+// @name            Hentai Heroes++ League Booster Detector Add-on
+// @description     Adding detection of boosters to league.
+// @version         0.0.8
+// @match           https://www.hentaiheroes.com/*
+// @match           https://nutaku.haremheroes.com/*
+// @match           https://eroges.hentaiheroes.com/*
+// @match           https://thrix.hentaiheroes.com/*
+// @match           https://test.hentaiheroes.com/*
+// @run-at          document-end
+// @updateURL       https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
+// @downloadURL     https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
+// @grant           none
+// @author          45026831(Numbers)
 // ==/UserScript==
 
 /*	===========
-	 CHANGELOG
-	=========== */
+     CHANGELOG
+    =========== */
 // 0.0.8: Changing to match new calculations for BDSM
 // 0.0.7: Setting an upper limit of 6 on the monostat count calculation
 // 0.0.6: Adjusting Jujubes formula to more accurately reflect actual equipment stats

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.8
+// @version         0.0.9
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -14,9 +14,10 @@
 // @author          45026831(Numbers)
 // ==/UserScript==
 
-/*	===========
+/*  ===========
      CHANGELOG
     =========== */
+// 0.0.9: Fixing typo in Cordy check
 // 0.0.8: Changing to match new calculations for BDSM
 // 0.0.7: Setting an upper limit of 6 on the monostat count calculation
 // 0.0.6: Adjusting Jujubes formula to more accurately reflect actual equipment stats
@@ -65,7 +66,6 @@ function boosterModule () {
     let opponentGirlSum
 
     function getStats() {
-        // INIT
         const {playerLeaguesData} = window
 
         opponentHasClub = !!playerLeaguesData.club.id_club
@@ -133,7 +133,7 @@ function boosterModule () {
 
         console.log(`CORDYCEPS CHECK: Expected: ${expectedAttack} (Unrounded: ${expectedUnrounded}), Actual: ${opponentAtk}, Extra: ${extraPercent}%`);
 
-        if (extraPercent) {
+        if (extraPercent > 0) {
             $('#leagues_right div.fighter-stats-container > div:nth-child(1)').addClass('boosted_cordy')
             addIcon('cordy')
         }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.9
+// @version         0.0.10
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -17,6 +17,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.0.10: Removing unrounded value from cordy debug output
 // 0.0.9: Fixing typo in Cordy check
 // 0.0.8: Changing to match new calculations for BDSM
 // 0.0.7: Setting an upper limit of 6 on the monostat count calculation
@@ -131,7 +132,7 @@ function boosterModule () {
         const expectedAttack = Math.ceil(expectedUnrounded)
         const extraPercent = Math.round(((opponentAtk - expectedAttack) / expectedAttack) * 100)
 
-        console.log(`CORDYCEPS CHECK: Expected: ${expectedAttack} (Unrounded: ${expectedUnrounded}), Actual: ${opponentAtk}, Extra: ${extraPercent}%`);
+        console.log(`CORDYCEPS CHECK: Expected: ${expectedAttack}, Actual: ${opponentAtk}, Extra: ${extraPercent}%`);
 
         if (extraPercent > 0) {
             $('#leagues_right div.fighter-stats-container > div:nth-child(1)').addClass('boosted_cordy')

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.10
+// @version         0.0.11
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -17,6 +17,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.0.11: Making use of new tooltip data attribute
 // 0.0.10: Removing unrounded value from cordy debug output
 // 0.0.9: Fixing typo in Cordy check
 // 0.0.8: Changing to match new calculations for BDSM
@@ -210,7 +211,7 @@ function boosterModule () {
     })
     function waitOpnt() {
         setTimeout(function() {
-            if (JSON.parse($('#leagues_right .team-member > img').attr('new-girl-tooltip-data'))) {
+            if ($('#leagues_right .team-member > img').data('new-girl-tooltip')) {
                 sessionStorage.setItem('opntName', opntName);
                 checkBoosters();
             }

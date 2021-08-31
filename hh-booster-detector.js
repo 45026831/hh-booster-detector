@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.11
+// @version         0.0.12
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -17,6 +17,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.0.12: If base stats not available, attempt to work backwards from derived stats, display estimates in stat tooltips
 // 0.0.11: Making use of new tooltip data attribute
 // 0.0.10: Removing unrounded value from cordy debug output
 // 0.0.9: Fixing typo in Cordy check
@@ -44,6 +45,20 @@ const currentPage = location.pathname
 const HC = 1
 const CH = 2
 const KH = 3
+const classRelationships = {
+    [HC]: {
+        s: KH,
+        t: CH
+    },
+    [CH]: {
+        s: HC,
+        t: KH
+    },
+    [KH]: {
+        s: CH,
+        t: HC
+    }
+};
 
 if (currentPage.includes('tower-of-fame')) {
     boosterModule()
@@ -66,6 +81,7 @@ function boosterModule () {
     let opponentMonostatCount
     let opponentHasClub
     let opponentGirlSum
+    let isEstimate
 
     function getStats() {
         const {playerLeaguesData} = window
@@ -83,6 +99,8 @@ function boosterModule () {
         opponentEndurance = caracs.endurance
         opponentAtk = caracs.damage
         opponentHarmony = caracs.chance
+        opponentDef = caracs.defense
+        isEstimate = false
 
         opponentGirlSum = playerLeaguesData.team.map(({caracs}) => Object.values(caracs).reduce((s,c) => s+c, 0)).reduce((s,c) => s+c, 0)
 
@@ -101,6 +119,36 @@ function boosterModule () {
             opponentScndStat = opponentCH
             opponentTertStat = opponentHC
         }
+
+        if (!opponentMainStat) {
+            opponentMainStat = Math.ceil(opponentAtk - (opponentGirlSum * 0.25))
+            isEstimate = true
+        }
+        
+        if (!opponentScndStat) {
+            const nonMainStatSum = (opponentDef - (opponentGirlSum * 0.12)) * 4
+
+            // 7+30 - Base secondary stat
+            // 5+30 - Base tertiary stat
+            // 7 - Per-level of rainbow
+            // 6 - max rainbow count
+            const secToTertRatio = 
+                (7+30+(7*6))/
+                (5+30+(7*6))
+
+            opponentScndStat = Math.ceil((nonMainStatSum / 2) * secToTertRatio)
+            opponentTertStat = Math.ceil((nonMainStatSum / 2) * (1/secToTertRatio))
+            isEstimate = true
+        }
+        if (!opponentEndurance) {
+            opponentEndurance = Math.ceil(opponentEgo - (opponentGirlSum * 2))
+            isEstimate = true
+        }
+        $('#leagues_right .stats_wrap .stat:nth-of-type(1)').attr('hh_title', `${isEstimate ? 'Estimate ':''}<span carac="class${opponentClass}"/> ${opponentMainStat}`)
+        $('#leagues_right .stats_wrap .stat:nth-of-type(3)').attr('hh_title', 
+            `${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].s}"/> ${opponentScndStat}<br/>
+             ${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].t}"/> ${opponentTertStat}`)
+        $('#leagues_right .stats_wrap .stat:nth-of-type(2)').attr('hh_title', `${isEstimate ? 'Estimate ':''}<span carac="endurance"/> ${opponentEndurance}`)
 
         const statRatio = opponentScndStat / opponentMainStat
         // 7+30 - Base secondary stat
@@ -191,14 +239,18 @@ function boosterModule () {
     }
 
     function addIcon (type) {
-        $('.leadTable .lead_table_default .booster_icons').append(`<span class="booster_icon boosted_${type}"></span>`)
+        if(!isEstimate) {
+            $('.leadTable .lead_table_default .booster_icons').append(`<span class="booster_icon boosted_${type}"></span>`)
+        }
     }
 
     function checkBoosters () {
         setupIconHolder()
         getStats()
-        checkChlorella()
-        checkCordyceps()
+        if (!isEstimate) {
+            checkChlorella()
+            checkCordyceps()
+        }
         checkGinseng()
         checkJujubes()
     }

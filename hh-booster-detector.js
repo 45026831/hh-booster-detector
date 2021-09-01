@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.12
+// @version         0.0.13
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -17,6 +17,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.0.13: Cleaning up the maths on estimations
 // 0.0.12: If base stats not available, attempt to work backwards from derived stats, display estimates in stat tooltips
 // 0.0.11: Making use of new tooltip data attribute
 // 0.0.10: Removing unrounded value from cordy debug output
@@ -67,12 +68,10 @@ if (currentPage.includes('tower-of-fame')) {
 function boosterModule () {
     let opponentLvl
     let opponentEgo
-    let opponentHC
-    let opponentCH
-    let opponentKH
     let opponentMainStat
     let opponentScndStat
     let opponentTertStat
+    let opponentNonMainStatSum
     let opponentAtk
     let opponentDef
     let opponentEndurance
@@ -93,9 +92,9 @@ function boosterModule () {
         const {caracs} = playerLeaguesData
 
         opponentEgo = caracs.ego
-        opponentHC = caracs.carac1
-        opponentCH = caracs.carac2
-        opponentKH = caracs.carac3
+        opponentMainStat = caracs[`carac${opponentClass}`]
+        opponentScndStat = caracs[`carac${classRelationships[opponentClass].s}`]
+        opponentTertStat = caracs[`carac${classRelationships[opponentClass].t}`]
         opponentEndurance = caracs.endurance
         opponentAtk = caracs.damage
         opponentHarmony = caracs.chance
@@ -104,64 +103,73 @@ function boosterModule () {
 
         opponentGirlSum = playerLeaguesData.team.map(({caracs}) => Object.values(caracs).reduce((s,c) => s+c, 0)).reduce((s,c) => s+c, 0)
 
-        if (opponentClass == HC) {
-            opponentMainStat = opponentHC
-            opponentScndStat = opponentKH
-            opponentTertStat = opponentCH
-        }
-        if (opponentClass == CH) {
-            opponentMainStat = opponentCH
-            opponentScndStat = opponentHC
-            opponentTertStat = opponentKH
-        }
-        if (opponentClass == KH) {
-            opponentMainStat = opponentKH
-            opponentScndStat = opponentCH
-            opponentTertStat = opponentHC
-        }
-
         if (!opponentMainStat) {
             opponentMainStat = Math.ceil(opponentAtk - (opponentGirlSum * 0.25))
             isEstimate = true
         }
-        
+
         if (!opponentScndStat) {
-            const nonMainStatSum = (opponentDef - (opponentGirlSum * 0.12)) * 4
-
-            // 7+30 - Base secondary stat
-            // 5+30 - Base tertiary stat
-            // 7 - Per-level of rainbow
-            // 6 - max rainbow count
-            const secToTertRatio = 
-                (7+30+(7*6))/
-                (5+30+(7*6))
-
-            opponentScndStat = Math.ceil((nonMainStatSum / 2) * secToTertRatio)
-            opponentTertStat = Math.ceil((nonMainStatSum / 2) * (1/secToTertRatio))
+            opponentNonMainStatSum = (opponentDef - (opponentGirlSum * 0.12)) * 4
             isEstimate = true
+        } else {
+            opponentNonMainStatSum = opponentScndStat + opponentTertStat
         }
         if (!opponentEndurance) {
             opponentEndurance = Math.ceil(opponentEgo - (opponentGirlSum * 2))
             isEstimate = true
         }
+
+        if (!isEstimate) {
+            const statRatio = opponentScndStat / opponentMainStat
+            // 7+30 - Base secondary stat
+            // 9+30 - Base primary stat
+            // 7 - per-level of rainbow
+            // 6 - max potential monostat
+            // 11 - per-level of monostat
+            // 4 - difference per-level between monostat and rainbow
+            opponentMonostatCount = Math.min(Math.round(
+                ((7+30+(7*6)) - ((9+30+(6*7)) * statRatio))
+                /
+                ((4 * statRatio) + 7)
+                ), 6)
+        } else {
+            const statRatio = opponentNonMainStatSum / opponentMainStat
+            // 5+30 - Base tertiary stat
+            // 7+30 - Base secondary stat
+            // 9+30 - Base primary stat
+            // 7 - per-level of rainbow
+            // 6 - max potential monostat
+            // 11 - per-level of monostat
+            // 4 - difference per-level between monostat and rainbow
+            // 2 - nuber of non-main stats to consider
+            opponentMonostatCount = Math.min(Math.round(
+                ((5+30 + 7+30 + (2*7*6))-((30+9+(7*6)) * statRatio))
+                /
+                ((4*statRatio) + 2*7)
+                ), 6)
+        }
+
+        if(!opponentScndStat && isEstimate) {
+            // 7+30 - Base secondary stat
+            // 5+30 - Base tertiary stat
+            // 7 - Per-level of rainbow
+            // 6 - max rainbow count
+            const secShare =
+            (7+30+(7*(6-opponentMonostatCount)))/
+            (7+30+(7*(6-opponentMonostatCount))) + (5+30+(7*(6-opponentMonostatCount)))
+            const tertShare =
+            (5+30+(7*(6-opponentMonostatCount)))/
+            (7+30+(7*(6-opponentMonostatCount))) + (5+30+(7*(6-opponentMonostatCount)))
+
+            opponentScndStat = Math.ceil(opponentNonMainStatSum * secShare)
+            opponentTertStat = Math.ceil(opponentNonMainStatSum * tertShare)
+        }
+
         $('#leagues_right .stats_wrap .stat:nth-of-type(1)').attr('hh_title', `${isEstimate ? 'Estimate ':''}<span carac="class${opponentClass}"/> ${opponentMainStat}`)
-        $('#leagues_right .stats_wrap .stat:nth-of-type(3)').attr('hh_title', 
+        $('#leagues_right .stats_wrap .stat:nth-of-type(3)').attr('hh_title',
             `${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].s}"/> ${opponentScndStat}<br/>
              ${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].t}"/> ${opponentTertStat}`)
         $('#leagues_right .stats_wrap .stat:nth-of-type(2)').attr('hh_title', `${isEstimate ? 'Estimate ':''}<span carac="endurance"/> ${opponentEndurance}`)
-
-        const statRatio = opponentScndStat / opponentMainStat
-        // 7+30 - Base secondary stat
-        // 9+30 - Base primary stat
-        // 7 - per-level of rainbow
-        // 6 - max potential monostat
-        // 11 - per-level of monostat
-        // 4 - difference per-level between monostat and rainbow
-        opponentMonostatCount = Math.min(Math.round(
-            ((7+30+(7*6)) - ((9+30+(6*7)) * statRatio))
-            /
-            ((4 * statRatio) + 7)
-        ), 6)
     }
 
     function checkChlorella () {
@@ -215,7 +223,7 @@ function boosterModule () {
             clubBonus = 1.1
         }
 
-        const expectedUnrounded = ((opponentScndStat + opponentTertStat) * 0.5 * clubBonus) + ((6 - opponentMonostatCount) * Math.ceil(90 + (opponentLvl * 9.1)))
+        const expectedUnrounded = ((opponentNonMainStatSum) * 0.5 * clubBonus) + ((6 - opponentMonostatCount) * Math.ceil(90 + (opponentLvl * 9.1)))
         const expectedHarmony = Math.ceil(expectedUnrounded)
         const extraPercent = Math.round(((opponentHarmony - expectedHarmony) / expectedHarmony) * 100)
 

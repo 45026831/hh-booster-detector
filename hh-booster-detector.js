@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.13
+// @version         0.0.14
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -17,6 +17,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.0.14: Fixing bug in secondary and tertiary stats for display
 // 0.0.13: Cleaning up the maths on estimations
 // 0.0.12: If base stats not available, attempt to work backwards from derived stats, display estimates in stat tooltips
 // 0.0.11: Making use of new tooltip data attribute
@@ -154,12 +155,10 @@ function boosterModule () {
             // 5+30 - Base tertiary stat
             // 7 - Per-level of rainbow
             // 6 - max rainbow count
-            const secShare =
-            (7+30+(7*(6-opponentMonostatCount)))/
-            (7+30+(7*(6-opponentMonostatCount))) + (5+30+(7*(6-opponentMonostatCount)))
-            const tertShare =
-            (5+30+(7*(6-opponentMonostatCount)))/
-            (7+30+(7*(6-opponentMonostatCount))) + (5+30+(7*(6-opponentMonostatCount)))
+            const secPerLevel = (7+30+(7*(6-opponentMonostatCount)))
+            const tertPerLevel = (5+30+(7*(6-opponentMonostatCount)))
+            const secShare = secPerLevel / (secPerLevel + tertPerLevel)
+            const tertShare = tertPerLevel / (secPerLevel + tertPerLevel)
 
             opponentScndStat = Math.ceil(opponentNonMainStatSum * secShare)
             opponentTertStat = Math.ceil(opponentNonMainStatSum * tertShare)

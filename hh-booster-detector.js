@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.14
+// @version         0.0.15
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -17,6 +17,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.0.15: Adding back chlorella checking in estimate scenario, cleaning up magic numbers into self-documenting code
 // 0.0.14: Fixing bug in secondary and tertiary stats for display
 // 0.0.13: Cleaning up the maths on estimations
 // 0.0.12: If base stats not available, attempt to work backwards from derived stats, display estimates in stat tooltips
@@ -34,6 +35,11 @@
 
 // Define jQuery
 const {$, location} = window;
+
+if (!$) {
+    console.log('HH++ BOOSTER DETECTOR WARNING: No jQuery found. Probably an error page. Ending the script here');
+    return;
+}
 
 // Define CSS
 const sheet = (function() {
@@ -60,7 +66,46 @@ const classRelationships = {
         s: CH,
         t: HC
     }
-};
+}
+
+// Magic numbers
+const RAINBOW_STAT_PER_LEVEL = 7.2
+const RAINBOW_HARM_PER_LEVEL = 9.1
+const RAINBOW_HARM_BASE      = 90
+const MONOSTAT_PER_LEVEL     = 11.15
+const PRIMARY_PER_LEVEL      = 9+30
+const SECONDARY_PER_LEVEL    = 7+30
+const TERTIARY_PER_LEVEL     = 5+30
+const ENDURANCE_PER_PRIMARY  = 4
+const DEFENCE_PER_NON_PRIM   = 0.25
+const HARMONY_PER_NON_PRIM   = 0.5
+const MIN_POTENTIAL_MONOSTAT = 0
+const MAX_POTENTIAL_MONOSTAT = 6
+const HAREM_BONUS_PER_LVL    = 52
+const RAINBOW_MONO_DIFF      = MONOSTAT_PER_LEVEL - RAINBOW_STAT_PER_LEVEL
+const FULL_RAINBOW_PER_LEVEL = 6 * RAINBOW_STAT_PER_LEVEL
+
+const boundMonostatCount = (count) => Math.max(MIN_POTENTIAL_MONOSTAT, Math.min(MAX_POTENTIAL_MONOSTAT, count))
+const getClubBonus = (hasClub, multiplier = 1) => hasClub ? 1 + (0.1*multiplier) : 1
+const estimateUnboostedEnduranceForLevel = (level, monostatCount, hasClub) => {
+    const basePrimary = basePrimaryStatForLevel(level)
+    const equipPrimary = rainbowStatForLevel(level, 6-monostatCount) + monostatStatForLevel(level, monostatCount)
+    const equipEndurance = rainbowStatForLevel(level, 6-monostatCount)
+    const haremBonus = estimateHaremBonusForLevel(level)
+    const clubBonus = getClubBonus(hasClub)
+    const comboClubBonus = getClubBonus(hasClub, 2)
+
+    return Math.round(ENDURANCE_PER_PRIMARY * basePrimary * comboClubBonus) +
+        Math.round(ENDURANCE_PER_PRIMARY * equipPrimary * clubBonus) +
+        equipEndurance * clubBonus +
+        haremBonus
+}
+const basePrimaryStatForLevel = (level) => level * PRIMARY_PER_LEVEL
+const rainbowStatForLevel = (level, count) => level * (count*RAINBOW_STAT_PER_LEVEL)
+const monostatStatForLevel = (level, count) => level * (count*MONOSTAT_PER_LEVEL)
+const estimateUnboostedPrimaryStatForLevel = (level, monostatCount, hasClub) =>
+    (basePrimaryStatForLevel(level) + equipStatPerLevel(level, monostatCount)) * getClubBonus(hasClub)
+const estimateHaremBonusForLevel = (level) => level * HAREM_BONUS_PER_LVL
 
 if (currentPage.includes('tower-of-fame')) {
     boosterModule()
@@ -122,41 +167,26 @@ function boosterModule () {
 
         if (!isEstimate) {
             const statRatio = opponentScndStat / opponentMainStat
-            // 7+30 - Base secondary stat
-            // 9+30 - Base primary stat
-            // 7 - per-level of rainbow
-            // 6 - max potential monostat
-            // 11 - per-level of monostat
-            // 4 - difference per-level between monostat and rainbow
-            opponentMonostatCount = Math.min(Math.round(
-                ((7+30+(7*6)) - ((9+30+(6*7)) * statRatio))
+
+            opponentMonostatCount = boundMonostatCount(Math.round(
+                ((SECONDARY_PER_LEVEL+FULL_RAINBOW_PER_LEVEL) - ((PRIMARY_PER_LEVEL+FULL_RAINBOW_PER_LEVEL) * statRatio))
                 /
-                ((4 * statRatio) + 7)
-                ), 6)
+                ((RAINBOW_MONO_DIFF * statRatio) + RAINBOW_STAT_PER_LEVEL)
+                ))
         } else {
             const statRatio = opponentNonMainStatSum / opponentMainStat
-            // 5+30 - Base tertiary stat
-            // 7+30 - Base secondary stat
-            // 9+30 - Base primary stat
-            // 7 - per-level of rainbow
-            // 6 - max potential monostat
-            // 11 - per-level of monostat
-            // 4 - difference per-level between monostat and rainbow
-            // 2 - nuber of non-main stats to consider
-            opponentMonostatCount = Math.min(Math.round(
-                ((5+30 + 7+30 + (2*7*6))-((30+9+(7*6)) * statRatio))
+
+            opponentMonostatCount = boundMonostatCount(Math.round(
+                ((TERTIARY_PER_LEVEL + SECONDARY_PER_LEVEL + (2*FULL_RAINBOW_PER_LEVEL))-((PRIMARY_PER_LEVEL+FULL_RAINBOW_PER_LEVEL) * statRatio))
                 /
-                ((4*statRatio) + 2*7)
-                ), 6)
+                ((RAINBOW_MONO_DIFF * statRatio) + 2*RAINBOW_STAT_PER_LEVEL)
+                ))
         }
 
         if(!opponentScndStat && isEstimate) {
-            // 7+30 - Base secondary stat
-            // 5+30 - Base tertiary stat
-            // 7 - Per-level of rainbow
-            // 6 - max rainbow count
-            const secPerLevel = (7+30+(7*(6-opponentMonostatCount)))
-            const tertPerLevel = (5+30+(7*(6-opponentMonostatCount)))
+            // Estimate sec and tert stats for display
+            const secPerLevel = (SECONDARY_PER_LEVEL+(RAINBOW_STAT_PER_LEVEL*(6-opponentMonostatCount)))
+            const tertPerLevel = (TERTIARY_PER_LEVEL+(RAINBOW_STAT_PER_LEVEL*(6-opponentMonostatCount)))
             const secShare = secPerLevel / (secPerLevel + tertPerLevel)
             const tertShare = tertPerLevel / (secPerLevel + tertPerLevel)
 
@@ -172,8 +202,16 @@ function boosterModule () {
     }
 
     function checkChlorella () {
-        const expectedEgo = opponentEndurance + (2 * opponentGirlSum)
-        const extraPercent = Math.round(((opponentEgo - expectedEgo) / expectedEgo) * 100)
+        let expectedEgo
+        let extraPercent = 0
+        if (!isEstimate) {
+            expectedEgo = opponentEndurance + (2 * opponentGirlSum)
+            extraPercent = Math.round(((opponentEgo - expectedEgo) / expectedEgo) * 100)
+        } else {
+            const expectedEndurance = estimateUnboostedEnduranceForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
+            expectedEgo = expectedEndurance + (2 * opponentGirlSum)
+            extraPercent = Math.round(((opponentEgo - expectedEgo) / expectedEgo) * 100)
+        }
 
         console.log(`CHLORELLA CHECK: Expected: ${expectedEgo}, Actual: ${opponentEgo}, Extra: ${extraPercent}%`);
 
@@ -255,9 +293,9 @@ function boosterModule () {
         setupIconHolder()
         getStats()
         if (!isEstimate) {
-            checkChlorella()
             checkCordyceps()
         }
+        checkChlorella()
         checkGinseng()
         checkJujubes()
     }

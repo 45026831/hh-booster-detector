@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.15
+// @version         0.0.16
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -17,6 +17,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.0.16: Improving accuracy of monostat calculation by using both attack and harmony
 // 0.0.15: Adding back chlorella checking in estimate scenario, cleaning up magic numbers into self-documenting code
 // 0.0.14: Fixing bug in secondary and tertiary stats for display
 // 0.0.13: Cleaning up the maths on estimations
@@ -176,11 +177,22 @@ function boosterModule () {
         } else {
             const statRatio = opponentNonMainStatSum / opponentMainStat
 
-            opponentMonostatCount = boundMonostatCount(Math.round(
+            const monostatCountFromAttack = Math.round(
                 ((TERTIARY_PER_LEVEL + SECONDARY_PER_LEVEL + (2*FULL_RAINBOW_PER_LEVEL))-((PRIMARY_PER_LEVEL+FULL_RAINBOW_PER_LEVEL) * statRatio))
                 /
                 ((RAINBOW_MONO_DIFF * statRatio) + 2*RAINBOW_STAT_PER_LEVEL)
-                ))
+                )
+            const monostatCountFromHarmony = Math.round(
+                MAX_POTENTIAL_MONOSTAT - (
+                    (opponentHarmony - opponentNonMainStatSum/2)
+                    /
+                    ((RAINBOW_HARM_BASE + (opponentLvl * RAINBOW_HARM_PER_LEVEL)) * getClubBonus(opponentHasClub))
+                )
+            )
+
+            opponentMonostatCount = boundMonostatCount(
+                Math.min(monostatCountFromAttack, monostatCountFromHarmony)
+            )
         }
 
         if(!opponentScndStat && isEstimate) {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.16
+// @version         0.0.17
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -11,12 +11,13 @@
 // @updateURL       https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
 // @downloadURL     https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
 // @grant           none
-// @author          45026831(Numbers)
+// @author          45026831(Numbers), zoopokemon
 // ==/UserScript==
 
 /*  ===========
      CHANGELOG
     =========== */
+// 0.0.17: Improving calculations in the estimate scenario using formulae from zoopokemon
 // 0.0.16: Improving accuracy of monostat calculation by using both attack and harmony
 // 0.0.15: Adding back chlorella checking in estimate scenario, cleaning up magic numbers into self-documenting code
 // 0.0.14: Fixing bug in secondary and tertiary stats for display
@@ -90,7 +91,7 @@ const boundMonostatCount = (count) => Math.max(MIN_POTENTIAL_MONOSTAT, Math.min(
 const getClubBonus = (hasClub, multiplier = 1) => hasClub ? 1 + (0.1*multiplier) : 1
 const estimateUnboostedEnduranceForLevel = (level, monostatCount, hasClub) => {
     const basePrimary = basePrimaryStatForLevel(level)
-    const equipPrimary = rainbowStatForLevel(level, 6-monostatCount) + monostatStatForLevel(level, monostatCount)
+    const equipPrimary = equipPrimaryStatForLevel(level, monostatCount)
     const equipEndurance = rainbowStatForLevel(level, 6-monostatCount)
     const haremBonus = estimateHaremBonusForLevel(level)
     const clubBonus = getClubBonus(hasClub)
@@ -102,11 +103,13 @@ const estimateUnboostedEnduranceForLevel = (level, monostatCount, hasClub) => {
         haremBonus
 }
 const basePrimaryStatForLevel = (level) => level * PRIMARY_PER_LEVEL
+const equipPrimaryStatForLevel = (level, monostatCount) => rainbowStatForLevel(level, 6-monostatCount) + monostatStatForLevel(level, monostatCount)
 const rainbowStatForLevel = (level, count) => level * (count*RAINBOW_STAT_PER_LEVEL)
 const monostatStatForLevel = (level, count) => level * (count*MONOSTAT_PER_LEVEL)
 const estimateUnboostedPrimaryStatForLevel = (level, monostatCount, hasClub) =>
-    (basePrimaryStatForLevel(level) + equipStatPerLevel(level, monostatCount)) * getClubBonus(hasClub)
+    (basePrimaryStatForLevel(level) + equipPrimaryStatForLevel(level, monostatCount)) * getClubBonus(hasClub)
 const estimateHaremBonusForLevel = (level) => level * HAREM_BONUS_PER_LVL
+const calculateExtraPercent = (expected, actual) => Math.round(((actual - expected) / expected) * 100)
 
 if (currentPage.includes('tower-of-fame')) {
     boosterModule()
@@ -215,15 +218,14 @@ function boosterModule () {
 
     function checkChlorella () {
         let expectedEgo
-        let extraPercent = 0
+
         if (!isEstimate) {
             expectedEgo = opponentEndurance + (2 * opponentGirlSum)
-            extraPercent = Math.round(((opponentEgo - expectedEgo) / expectedEgo) * 100)
         } else {
             const expectedEndurance = estimateUnboostedEnduranceForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
             expectedEgo = expectedEndurance + (2 * opponentGirlSum)
-            extraPercent = Math.round(((opponentEgo - expectedEgo) / expectedEgo) * 100)
         }
+        const extraPercent = calculateExtraPercent(expectedEgo, opponentEgo)
 
         console.log(`CHLORELLA CHECK: Expected: ${expectedEgo}, Actual: ${opponentEgo}, Extra: ${extraPercent}%`);
 
@@ -234,9 +236,15 @@ function boosterModule () {
     }
 
     function checkCordyceps () {
-        const expectedUnrounded = opponentMainStat + (0.25 * opponentGirlSum)
-        const expectedAttack = Math.ceil(expectedUnrounded)
-        const extraPercent = Math.round(((opponentAtk - expectedAttack) / expectedAttack) * 100)
+        let expectedAttack
+        if (!isEstimate) {
+            const expectedUnrounded = opponentMainStat + (0.25 * opponentGirlSum)
+            expectedAttack = Math.ceil(expectedUnrounded)
+        } else {
+            const expectedMainStat = estimateUnboostedPrimaryStatForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
+            expectedAttack = expectedMainStat + (0.25 * opponentGirlSum)
+        }
+        const extraPercent = calculateExtraPercent(expectedAttack, opponentAtk)
 
         console.log(`CORDYCEPS CHECK: Expected: ${expectedAttack}, Actual: ${opponentAtk}, Extra: ${extraPercent}%`);
 
@@ -247,18 +255,20 @@ function boosterModule () {
     }
 
     function checkGinseng () {
-        // 9 free per level, 30 market per level, 10% club boost
-        let clubBonus = 1
-        if (opponentHasClub) {
-            clubBonus = 1.1
+        let expectedMainStat
+        let expectedNonMainStatSum
+        let extraPercent
+        if (!isEstimate) {
+            expectedMainStat = estimateUnboostedPrimaryStatForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
+            extraPercent = calculateExtraPercent(expectedMainStat, opponentMainStat)
+        } else {
+            expectedNonMainStatSum = opponentLvl * (SECONDARY_PER_LEVEL + TERTIARY_PER_LEVEL + 2*RAINBOW_STAT_PER_LEVEL*(6-opponentMonostatCount))
+            extraPercent = Math.round(
+                ((opponentNonMainStatSum / expectedNonMainStatSum) - getClubBonus(opponentHasClub)) * 100
+            )
         }
 
-        const varianceMultiplier = 1 + (opponentLvl * 0.00005)
-        const expectedUnrounded = (opponentLvl * (9 + 30 + ((7 * (6 - opponentMonostatCount)) + (11 * opponentMonostatCount)) * varianceMultiplier)) * clubBonus
-        const expectedMainStat = Math.ceil(expectedUnrounded)
-        const extraPercent = Math.round(((opponentMainStat - expectedMainStat) / expectedMainStat) * 100)
-
-        console.log(`GINSENG CHECK: Expected: ${expectedMainStat}, Actual: ${opponentMainStat}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
+        console.log(`GINSENG CHECK: Expected: ${isEstimate ? expectedNonMainStatSum : expectedMainStat}, Actual: ${isEstimate ? opponentNonMainStatSum : opponentMainStat}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
 
         if (extraPercent > 0) {
             $('#leagues_right div.fighter-stats-container > div:nth-child(3)').addClass('boosted_ginseng')
@@ -267,14 +277,11 @@ function boosterModule () {
     }
 
     function checkJujubes () {
-        let clubBonus = 1
-        if (opponentHasClub) {
-            clubBonus = 1.1
-        }
+        const clubBonus = getClubBonus(opponentHasClub)
 
-        const expectedUnrounded = ((opponentNonMainStatSum) * 0.5 * clubBonus) + ((6 - opponentMonostatCount) * Math.ceil(90 + (opponentLvl * 9.1)))
+        const expectedUnrounded = ((opponentNonMainStatSum) * 0.5 * clubBonus) + ((6 - opponentMonostatCount) * Math.ceil(RAINBOW_HARM_BASE + (opponentLvl * RAINBOW_HARM_PER_LEVEL)))
         const expectedHarmony = Math.ceil(expectedUnrounded)
-        const extraPercent = Math.round(((opponentHarmony - expectedHarmony) / expectedHarmony) * 100)
+        const extraPercent = calculateExtraPercent(expectedHarmony, opponentHarmony)
 
         console.log(`JUJUBES CHECK: Expected: ${expectedHarmony}, Actual: ${opponentHarmony}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
 
@@ -304,9 +311,8 @@ function boosterModule () {
     function checkBoosters () {
         setupIconHolder()
         getStats()
-        if (!isEstimate) {
-            checkCordyceps()
-        }
+
+        checkCordyceps()
         checkChlorella()
         checkGinseng()
         checkJujubes()
@@ -321,7 +327,6 @@ function boosterModule () {
     function waitOpnt() {
         setTimeout(function() {
             if ($('#leagues_right .team-member > img').data('new-girl-tooltip')) {
-                sessionStorage.setItem('opntName', opntName);
                 checkBoosters();
             }
             else {

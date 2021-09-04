@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.0.17
+// @version         0.1.0
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -17,6 +17,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.0: Major refactor around how results are displayed, slight boosts are shown in orange instead of full red, logs disabled by default with details moved into tooltips
 // 0.0.17: Improving calculations in the estimate scenario using formulae from zoopokemon
 // 0.0.16: Improving accuracy of monostat calculation by using both attack and harmony
 // 0.0.15: Adding back chlorella checking in estimate scenario, cleaning up magic numbers into self-documenting code
@@ -37,6 +38,7 @@
 
 // Define jQuery
 const {$, location} = window;
+const LOGS_ENABLED = false
 
 if (!$) {
     console.log('HH++ BOOSTER DETECTOR WARNING: No jQuery found. Probably an error page. Ending the script here');
@@ -70,6 +72,12 @@ const classRelationships = {
     }
 }
 
+const lang = $('html')[0].lang.substring(0,2)
+let locale = 'fr'
+if (lang === 'en') {
+    locale = 'en'
+}
+
 // Magic numbers
 const RAINBOW_STAT_PER_LEVEL = 7.2
 const RAINBOW_HARM_PER_LEVEL = 9.1
@@ -86,6 +94,10 @@ const MAX_POTENTIAL_MONOSTAT = 6
 const HAREM_BONUS_PER_LVL    = 52
 const RAINBOW_MONO_DIFF      = MONOSTAT_PER_LEVEL - RAINBOW_STAT_PER_LEVEL
 const FULL_RAINBOW_PER_LEVEL = 6 * RAINBOW_STAT_PER_LEVEL
+const LEGENDARY_CHLORELLA    = 10
+const LEGENDARY_CORDYCEPS    = 10
+const LEGENDARY_GINSENG      = 6
+const LEGENDARY_JUJUBES      = 20
 
 const boundMonostatCount = (count) => Math.max(MIN_POTENTIAL_MONOSTAT, Math.min(MAX_POTENTIAL_MONOSTAT, count))
 const getClubBonus = (hasClub, multiplier = 1) => hasClub ? 1 + (0.1*multiplier) : 1
@@ -110,6 +122,15 @@ const estimateUnboostedPrimaryStatForLevel = (level, monostatCount, hasClub) =>
     (basePrimaryStatForLevel(level) + equipPrimaryStatForLevel(level, monostatCount)) * getClubBonus(hasClub)
 const estimateHaremBonusForLevel = (level) => level * HAREM_BONUS_PER_LVL
 const calculateExtraPercent = (expected, actual) => Math.round(((actual - expected) / expected) * 100)
+const buildResultTooltip = (existingContent, caracs, expected, actual, extraPercent) =>
+`${existingContent ? existingContent : ''}
+<hr/>
+<table>
+<tr><td>Expected ${caracs.map(carac => `<span carac="${carac}"/>`).join('+')}:</td><td>${Math.round(expected).toLocaleString(locale)}</td></tr>
+<tr><td>Actual ${caracs.map(carac => `<span carac="${carac}"/>`).join('+')}:</td><td>${Math.round(actual).toLocaleString(locale)}</td></tr>
+</table>
+${extraPercent > 0 ? `Extra: ${extraPercent}%` : ''}
+`
 
 if (currentPage.includes('tower-of-fame')) {
     boosterModule()
@@ -131,6 +152,10 @@ function boosterModule () {
     let opponentHasClub
     let opponentGirlSum
     let isEstimate
+    let $attack
+    let $ego
+    let $defense
+    let $harmony
 
     function getStats() {
         const {playerLeaguesData} = window
@@ -209,11 +234,32 @@ function boosterModule () {
             opponentTertStat = Math.ceil(opponentNonMainStatSum * tertShare)
         }
 
-        $('#leagues_right .stats_wrap .stat:nth-of-type(1)').attr('hh_title', `${isEstimate ? 'Estimate ':''}<span carac="class${opponentClass}"/> ${opponentMainStat}`)
-        $('#leagues_right .stats_wrap .stat:nth-of-type(3)').attr('hh_title',
-            `${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].s}"/> ${opponentScndStat}<br/>
-             ${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].t}"/> ${opponentTertStat}`)
-        $('#leagues_right .stats_wrap .stat:nth-of-type(2)').attr('hh_title', `${isEstimate ? 'Estimate ':''}<span carac="endurance"/> ${opponentEndurance}`)
+        $attack = $('#leagues_right .stats_wrap .stat:nth-of-type(1)')
+        $ego = $('#leagues_right .stats_wrap .stat:nth-of-type(2)')
+        $defense = $('#leagues_right .stats_wrap .stat:nth-of-type(3)')
+        $harmony = $('#leagues_right .stats_wrap .stat:nth-of-type(4)')
+
+        const existingAttackTooltip = $attack.attr('hh_title')
+        const existingDefenceTooltip = $defense.attr('hh_title')
+        let existingEgoTooltip = $ego.attr('hh_title')
+        let existingHarmonyTooltip = $harmony.attr('hh_title')
+        if (existingEgoTooltip === '##carac_ego') {
+            existingEgoTooltip = GT.ego
+        }
+        if (existingHarmonyTooltip === '!!HH_design:carac_chance!!') {
+            existingHarmonyTooltip = GT.chance
+        }
+
+        $attack.attr('hh_title',
+            `${existingAttackTooltip}<br/>
+            ${isEstimate ? 'Estimate ':''}<span carac="class${opponentClass}"/> ${opponentMainStat.toLocaleString(locale)}<br/>
+            Monostat count: ${opponentMonostatCount}`)
+        $defense.attr('hh_title',
+            `${existingDefenceTooltip}<br/>
+            ${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].s}"/> ${opponentScndStat.toLocaleString(locale)}<br/>
+            ${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].t}"/> ${opponentTertStat.toLocaleString(locale)}`)
+        $ego.attr('hh_title', `${existingEgoTooltip}<br/>${isEstimate ? 'Estimate ':''}<span carac="endurance"/> ${opponentEndurance.toLocaleString(locale)}`)
+        $harmony.attr('hh_title', existingHarmonyTooltip)
     }
 
     function checkChlorella () {
@@ -227,10 +273,17 @@ function boosterModule () {
         }
         const extraPercent = calculateExtraPercent(expectedEgo, opponentEgo)
 
-        console.log(`CHLORELLA CHECK: Expected: ${expectedEgo}, Actual: ${opponentEgo}, Extra: ${extraPercent}%`);
+        if(LOGS_ENABLED) console.log(`CHLORELLA CHECK: Expected: ${expectedEgo}, Actual: ${opponentEgo}, Extra: ${extraPercent}%`);
+        const existingTooltip = $ego.attr('hh_title')
+        const newTooltip = buildResultTooltip(existingTooltip, ['ego'], expectedEgo, opponentEgo, extraPercent)
+        $ego.attr('hh_title', newTooltip)
 
         if (extraPercent > 0) {
-            $('#leagues_right div.fighter-stats-container > div:nth-child(2)').addClass('boosted_chlor')
+            let boosted = 'boosted'
+            if (extraPercent < 0.25 * LEGENDARY_CHLORELLA) {
+                boosted = 'boosted_light'
+            }
+            $ego.addClass(boosted)
             addIcon('chlor')
         }
     }
@@ -246,10 +299,17 @@ function boosterModule () {
         }
         const extraPercent = calculateExtraPercent(expectedAttack, opponentAtk)
 
-        console.log(`CORDYCEPS CHECK: Expected: ${expectedAttack}, Actual: ${opponentAtk}, Extra: ${extraPercent}%`);
+        if(LOGS_ENABLED) console.log(`CORDYCEPS CHECK: Expected: ${expectedAttack}, Actual: ${opponentAtk}, Extra: ${extraPercent}%`);
+        const existingTooltip = $attack.attr('hh_title')
+        const newTooltip = buildResultTooltip(existingTooltip, ['damage'], expectedAttack, opponentAtk, extraPercent)
+        $attack.attr('hh_title', newTooltip)
 
         if (extraPercent > 0) {
-            $('#leagues_right div.fighter-stats-container > div:nth-child(1)').addClass('boosted_cordy')
+            let boosted = 'boosted'
+            if (extraPercent < 0.25 * LEGENDARY_CORDYCEPS) {
+                boosted = 'boosted_light'
+            }
+            $('#leagues_right div.fighter-stats-container > div:nth-child(1)').addClass(boosted)
             addIcon('cordy')
         }
     }
@@ -268,10 +328,22 @@ function boosterModule () {
             )
         }
 
-        console.log(`GINSENG CHECK: Expected: ${isEstimate ? expectedNonMainStatSum : expectedMainStat}, Actual: ${isEstimate ? opponentNonMainStatSum : opponentMainStat}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
+        if(LOGS_ENABLED) console.log(`GINSENG CHECK: Expected: ${isEstimate ? expectedNonMainStatSum : expectedMainStat}, Actual: ${isEstimate ? opponentNonMainStatSum : opponentMainStat}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
+        const existingTooltip = $defense.attr('hh_title')
+        const newTooltip = buildResultTooltip(
+            existingTooltip, 
+            isEstimate ? [`class${classRelationships[opponentClass].s}`, `class${classRelationships[opponentClass].t}`] : [`class${opponentClass}`],
+            isEstimate ? expectedNonMainStatSum * getClubBonus(opponentHasClub) : expectedMainStat,
+            isEstimate ? opponentNonMainStatSum : opponentMainStat,
+            extraPercent)
+        $defense.attr('hh_title', newTooltip)
 
         if (extraPercent > 0) {
-            $('#leagues_right div.fighter-stats-container > div:nth-child(3)').addClass('boosted_ginseng')
+            let boosted = 'boosted'
+            if (extraPercent < 0.25 * LEGENDARY_GINSENG) {
+                boosted = 'boosted_light'
+            }
+            $('#leagues_right div.fighter-stats-container > div:nth-child(3)').addClass(boosted)
             addIcon('ginseng')
         }
     }
@@ -283,10 +355,17 @@ function boosterModule () {
         const expectedHarmony = Math.ceil(expectedUnrounded)
         const extraPercent = calculateExtraPercent(expectedHarmony, opponentHarmony)
 
-        console.log(`JUJUBES CHECK: Expected: ${expectedHarmony}, Actual: ${opponentHarmony}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
+        if(LOGS_ENABLED) console.log(`JUJUBES CHECK: Expected: ${expectedHarmony}, Actual: ${opponentHarmony}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
+        const existingTooltip = $harmony.attr('hh_title')
+        const newTooltip = buildResultTooltip(existingTooltip, ['chance'], expectedHarmony, opponentHarmony, extraPercent)
+        $harmony.attr('hh_title', newTooltip)
 
         if (extraPercent > 0) {
-            $('#leagues_right div.fighter-stats-container > div:nth-child(4)').addClass('boosted_jujubes')
+            let boosted = 'boosted'
+            if (extraPercent < 0.25 * LEGENDARY_JUJUBES) {
+                boosted = 'boosted_light'
+            }
+            $('#leagues_right div.fighter-stats-container > div:nth-child(4)').addClass(boosted)
             addIcon('jujubes')
         }
     }
@@ -346,8 +425,13 @@ function boosterModule () {
     observer.observe(test, {attributes: false, childList: true, subtree: false});
 
     sheet.insertRule(`
-    #leagues_right .boosted_chlor, #leagues_right .boosted_cordy, #leagues_right .boosted_ginseng, #leagues_right .boosted_jujubes {
+    #leagues_right .boosted {
         color: #FF2F2F;
+    }
+    `);
+    sheet.insertRule(`
+    #leagues_right .boosted_light {
+        color: #FFA500;
     }
     `);
     sheet.insertRule(`

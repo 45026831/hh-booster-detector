@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.0
+// @version         0.1.1
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
 // @match           https://thrix.hentaiheroes.com/*
 // @match           https://test.hentaiheroes.com/*
+// @match           https://www.gayharem.com/*
+// @match           https://nutaku.gayharem.com/*
 // @run-at          document-end
 // @updateURL       https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
 // @downloadURL     https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
@@ -17,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.1: Adding back text stroke on boosted stats to be easier on the eyes. Adding matchers for GH
 // 0.1.0: Major refactor around how results are displayed, slight boosts are shown in orange instead of full red, logs disabled by default with details moved into tooltips
 // 0.0.17: Improving calculations in the estimate scenario using formulae from zoopokemon
 // 0.0.16: Improving accuracy of monostat calculation by using both attack and harmony
@@ -427,11 +430,13 @@ function boosterModule () {
     sheet.insertRule(`
     #leagues_right .boosted {
         color: #FF2F2F;
+        text-shadow: rgb(0, 0, 0) 1px 1px 0px, rgb(0, 0, 0) -1px 1px 0px, rgb(0, 0, 0) -1px -1px 0px, rgb(0, 0, 0) 1px -1px 0px;
     }
     `);
     sheet.insertRule(`
     #leagues_right .boosted_light {
         color: #FFA500;
+        text-shadow: rgb(0, 0, 0) 1px 1px 0px, rgb(0, 0, 0) -1px 1px 0px, rgb(0, 0, 0) -1px -1px 0px, rgb(0, 0, 0) 1px -1px 0px;
     }
     `);
     sheet.insertRule(`

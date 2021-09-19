@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.1
+// @version         0.1.2
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.2: Adding support for mobile
 // 0.1.1: Adding back text stroke on boosted stats to be easier on the eyes. Adding matchers for GH
 // 0.1.0: Major refactor around how results are displayed, slight boosts are shown in orange instead of full red, logs disabled by default with details moved into tooltips
 // 0.0.17: Improving calculations in the estimate scenario using formulae from zoopokemon
@@ -159,6 +160,10 @@ function boosterModule () {
     let $ego
     let $defense
     let $harmony
+    let $attackMobile
+    let $egoMobile
+    let $defenseMobile
+    let $harmonyMobile
 
     function getStats() {
         const {playerLeaguesData} = window
@@ -241,6 +246,10 @@ function boosterModule () {
         $ego = $('#leagues_right .stats_wrap .stat:nth-of-type(2)')
         $defense = $('#leagues_right .stats_wrap .stat:nth-of-type(3)')
         $harmony = $('#leagues_right .stats_wrap .stat:nth-of-type(4)')
+        $attackMobile = $('.selected-player-leagues .carac.attack')
+        $egoMobile = $('.selected-player-leagues .carac.excitement') // [sic]
+        $defenseMobile = $('.selected-player-leagues .carac.def0')
+        $harmonyMobile = $('.selected-player-leagues .carac.harmony')
 
         const existingAttackTooltip = $attack.attr('hh_title')
         const existingDefenceTooltip = $defense.attr('hh_title')
@@ -287,6 +296,7 @@ function boosterModule () {
                 boosted = 'boosted_light'
             }
             $ego.addClass(boosted)
+            $egoMobile.addClass(boosted)
             addIcon('chlor')
         }
     }
@@ -312,7 +322,8 @@ function boosterModule () {
             if (extraPercent < 0.25 * LEGENDARY_CORDYCEPS) {
                 boosted = 'boosted_light'
             }
-            $('#leagues_right div.fighter-stats-container > div:nth-child(1)').addClass(boosted)
+            $attack.addClass(boosted)
+            $attackMobile.addClass(boosted)
             addIcon('cordy')
         }
     }
@@ -346,7 +357,8 @@ function boosterModule () {
             if (extraPercent < 0.25 * LEGENDARY_GINSENG) {
                 boosted = 'boosted_light'
             }
-            $('#leagues_right div.fighter-stats-container > div:nth-child(3)').addClass(boosted)
+            $defense.addClass(boosted)
+            $defenseMobile.addClass(boosted)
             addIcon('ginseng')
         }
     }
@@ -368,7 +380,8 @@ function boosterModule () {
             if (extraPercent < 0.25 * LEGENDARY_JUJUBES) {
                 boosted = 'boosted_light'
             }
-            $('#leagues_right div.fighter-stats-container > div:nth-child(4)').addClass(boosted)
+            $harmony.addClass(boosted)
+            $harmonyMobile.addClass(boosted)
             addIcon('jujubes')
         }
     }
@@ -428,13 +441,13 @@ function boosterModule () {
     observer.observe(test, {attributes: false, childList: true, subtree: false});
 
     sheet.insertRule(`
-    #leagues_right .boosted {
+    #leagues_right .boosted, .selected-player-leagues .boosted {
         color: #FF2F2F;
         text-shadow: rgb(0, 0, 0) 1px 1px 0px, rgb(0, 0, 0) -1px 1px 0px, rgb(0, 0, 0) -1px -1px 0px, rgb(0, 0, 0) 1px -1px 0px;
     }
     `);
     sheet.insertRule(`
-    #leagues_right .boosted_light {
+    #leagues_right .boosted_light, .selected-player-leagues .boosted_light {
         color: #FFA500;
         text-shadow: rgb(0, 0, 0) 1px 1px 0px, rgb(0, 0, 0) -1px 1px 0px, rgb(0, 0, 0) -1px -1px 0px, rgb(0, 0, 0) 1px -1px 0px;
     }

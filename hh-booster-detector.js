@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.2
+// @version         0.1.3
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.3: Removing manual summing of girl stats, using totalPower value instead
 // 0.1.2: Adding support for mobile
 // 0.1.1: Adding back text stroke on boosted stats to be easier on the eyes. Adding matchers for GH
 // 0.1.0: Major refactor around how results are displayed, slight boosts are shown in orange instead of full red, logs disabled by default with details moved into tooltips
@@ -184,7 +185,7 @@ function boosterModule () {
         opponentDef = caracs.defense
         isEstimate = false
 
-        opponentGirlSum = playerLeaguesData.team.map(({caracs}) => Object.values(caracs).reduce((s,c) => s+c, 0)).reduce((s,c) => s+c, 0)
+        opponentGirlSum = playerLeaguesData.totalPower
 
         if (!opponentMainStat) {
             opponentMainStat = Math.ceil(opponentAtk - (opponentGirlSum * 0.25))

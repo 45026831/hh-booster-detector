@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.3
+// @version         0.1.4
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.4: Accounting for element synergy bonuses in stats
 // 0.1.3: Removing manual summing of girl stats, using totalPower value instead
 // 0.1.2: Adding support for mobile
 // 0.1.1: Adding back text stroke on boosted stats to be easier on the eyes. Adding matchers for GH
@@ -156,6 +157,7 @@ function boosterModule () {
     let opponentMonostatCount
     let opponentHasClub
     let opponentGirlSum
+    let opponentBonuses
     let isEstimate
     let $attack
     let $ego
@@ -187,19 +189,29 @@ function boosterModule () {
 
         opponentGirlSum = playerLeaguesData.totalPower
 
+        const {team} = playerLeaguesData
+        const opponentTeamMemberElements = [];
+        [0,1,2,3,4,5,6].forEach(key => {
+            const teamMember = team[key]
+            if (teamMember && teamMember.element) {
+                opponentTeamMemberElements.push(teamMember.element)
+            }
+        })
+        opponentBonuses = calculateSynergiesFromTeamMemberElements(opponentTeamMemberElements)
+
         if (!opponentMainStat) {
-            opponentMainStat = Math.ceil(opponentAtk - (opponentGirlSum * 0.25))
+            opponentMainStat = Math.ceil((opponentAtk/(1+opponentBonuses.attack)) - (opponentGirlSum * 0.25))
             isEstimate = true
         }
 
         if (!opponentScndStat) {
-            opponentNonMainStatSum = (opponentDef - (opponentGirlSum * 0.12)) * 4
+            opponentNonMainStatSum = ((opponentDef/(1+opponentBonuses.defense)) - (opponentGirlSum * 0.12)) * 4
             isEstimate = true
         } else {
             opponentNonMainStatSum = opponentScndStat + opponentTertStat
         }
         if (!opponentEndurance) {
-            opponentEndurance = Math.ceil(opponentEgo - (opponentGirlSum * 2))
+            opponentEndurance = Math.ceil((opponentEgo/(1+opponentBonuses.ego)) - (opponentGirlSum * 2))
             isEstimate = true
         }
 
@@ -221,7 +233,7 @@ function boosterModule () {
                 )
             const monostatCountFromHarmony = Math.round(
                 MAX_POTENTIAL_MONOSTAT - (
-                    (opponentHarmony - opponentNonMainStatSum/2)
+                    ((opponentHarmony/(1+opponentBonuses.harmony)) - opponentNonMainStatSum/2)
                     /
                     ((RAINBOW_HARM_BASE + (opponentLvl * RAINBOW_HARM_PER_LEVEL)) * getClubBonus(opponentHasClub))
                 )
@@ -275,6 +287,28 @@ function boosterModule () {
         $harmony.attr('hh_title', existingHarmonyTooltip)
     }
 
+    function calculateSynergiesFromTeamMemberElements(elements) {
+        const counts = elements.reduce((a,b)=>{a[b]++;return a}, {
+            fire: 0,
+            stone: 0,
+            sun: 0,
+            water: 0,
+            nature: 0,
+            darkness: 0,
+            light: 0,
+            psychic: 0
+        })
+    
+        // Only care about those included in the stats: darkness, light, psychic, nature
+        // Assume max harem synergy
+        return {
+            attack:  (0.0007 * 100) + (0.02 * counts.darkness),
+            defense: (0.0007 * 100) + (0.02 * counts.light),
+            harmony: (0.0007 * 100) + (0.02 * counts.psychic),
+            ego:     (0.001  * 100) + (0.03 * counts.nature)
+        }
+    }
+
     function checkChlorella () {
         let expectedEgo
 
@@ -282,7 +316,7 @@ function boosterModule () {
             expectedEgo = opponentEndurance + (2 * opponentGirlSum)
         } else {
             const expectedEndurance = estimateUnboostedEnduranceForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
-            expectedEgo = expectedEndurance + (2 * opponentGirlSum)
+            expectedEgo = Math.ceil((expectedEndurance + (2 * opponentGirlSum)) * (1 + opponentBonuses.ego))
         }
         const extraPercent = calculateExtraPercent(expectedEgo, opponentEgo)
 
@@ -309,7 +343,7 @@ function boosterModule () {
             expectedAttack = Math.ceil(expectedUnrounded)
         } else {
             const expectedMainStat = estimateUnboostedPrimaryStatForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
-            expectedAttack = expectedMainStat + (0.25 * opponentGirlSum)
+            expectedAttack = Math.ceil((expectedMainStat + (0.25 * opponentGirlSum)) * (1 + opponentBonuses.attack))
         }
         const extraPercent = calculateExtraPercent(expectedAttack, opponentAtk)
 
@@ -367,7 +401,7 @@ function boosterModule () {
     function checkJujubes () {
         const clubBonus = getClubBonus(opponentHasClub)
 
-        const expectedUnrounded = ((opponentNonMainStatSum) * 0.5 * clubBonus) + ((6 - opponentMonostatCount) * Math.ceil(RAINBOW_HARM_BASE + (opponentLvl * RAINBOW_HARM_PER_LEVEL)))
+        const expectedUnrounded = ((opponentNonMainStatSum * 0.5 * clubBonus) + ((6 - opponentMonostatCount) * Math.ceil(RAINBOW_HARM_BASE + (opponentLvl * RAINBOW_HARM_PER_LEVEL)))) * (1 + opponentBonuses.harmony)
         const expectedHarmony = Math.ceil(expectedUnrounded)
         const extraPercent = calculateExtraPercent(expectedHarmony, opponentHarmony)
 

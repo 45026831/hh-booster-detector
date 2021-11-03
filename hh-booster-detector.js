@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.4
+// @version         0.1.5
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -9,6 +9,7 @@
 // @match           https://test.hentaiheroes.com/*
 // @match           https://www.gayharem.com/*
 // @match           https://nutaku.gayharem.com/*
+// @match           https://*.comixharem.com/*
 // @run-at          document-end
 // @updateURL       https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
 // @downloadURL     https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
@@ -19,6 +20,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.5: Adding matcher for CxH
 // 0.1.4: Accounting for element synergy bonuses in stats
 // 0.1.3: Removing manual summing of girl stats, using totalPower value instead
 // 0.1.2: Adding support for mobile

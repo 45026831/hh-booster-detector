@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.5
+// @version         0.1.6
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -20,6 +20,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.6: Emergency fixes for camelCase vars renamed to snake_case
 // 0.1.5: Adding matcher for CxH
 // 0.1.4: Accounting for element synergy bonuses in stats
 // 0.1.3: Removing manual summing of girl stats, using totalPower value instead
@@ -189,7 +190,7 @@ function boosterModule () {
         opponentDef = caracs.defense
         isEstimate = false
 
-        opponentGirlSum = playerLeaguesData.totalPower
+        opponentGirlSum = playerLeaguesData.totalPower || playerLeaguesData.total_power
 
         const {team} = playerLeaguesData
         const opponentTeamMemberElements = [];

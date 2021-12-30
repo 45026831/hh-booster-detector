@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.6
+// @version         0.1.7
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -20,6 +20,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.7: Applying the club bonus to harem level, fixing rainbow stat per level magic number
 // 0.1.6: Emergency fixes for camelCase vars renamed to snake_case
 // 0.1.5: Adding matcher for CxH
 // 0.1.4: Accounting for element synergy bonuses in stats
@@ -88,7 +89,7 @@ if (lang === 'en') {
 }
 
 // Magic numbers
-const RAINBOW_STAT_PER_LEVEL = 7.2
+const RAINBOW_STAT_PER_LEVEL = 7
 const RAINBOW_HARM_PER_LEVEL = 9.1
 const RAINBOW_HARM_BASE      = 90
 const MONOSTAT_PER_LEVEL     = 11.15
@@ -121,7 +122,7 @@ const estimateUnboostedEnduranceForLevel = (level, monostatCount, hasClub) => {
     return Math.round(ENDURANCE_PER_PRIMARY * basePrimary * comboClubBonus) +
         Math.round(ENDURANCE_PER_PRIMARY * equipPrimary * clubBonus) +
         equipEndurance * clubBonus +
-        haremBonus
+        haremBonus * clubBonus
 }
 const basePrimaryStatForLevel = (level) => level * PRIMARY_PER_LEVEL
 const equipPrimaryStatForLevel = (level, monostatCount) => rainbowStatForLevel(level, 6-monostatCount) + monostatStatForLevel(level, monostatCount)

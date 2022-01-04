@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.7
+// @version         0.1.8
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -20,6 +20,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.8: Pre-empting change to playerLeaguesData currently being tested on TS. Using now-exposed opponent synergies to improve accuracy.
 // 0.1.7: Applying the club bonus to harem level, fixing rainbow stat per level magic number
 // 0.1.6: Emergency fixes for camelCase vars renamed to snake_case
 // 0.1.5: Adding matcher for CxH
@@ -142,6 +143,11 @@ const buildResultTooltip = (existingContent, caracs, expected, actual, extraPerc
 ${extraPercent > 0 ? `Extra: ${extraPercent}%` : ''}
 `
 
+function findBonusFromSynergies(synergies, element) {
+    const {bonus_multiplier} = synergies.find(({element: {type}})=>type===element)
+    return bonus_multiplier
+}
+
 if (currentPage.includes('tower-of-fame')) {
     boosterModule()
 }
@@ -175,33 +181,54 @@ function boosterModule () {
     function getStats() {
         const {playerLeaguesData} = window
 
-        opponentHasClub = !!playerLeaguesData.club.id_club
+        opponentHasClub = !!(playerLeaguesData.club && playerLeaguesData.club.id_club)
         opponentLvl = parseInt(playerLeaguesData.level, 10)
         opponentClass = playerLeaguesData.class
 
         const {caracs} = playerLeaguesData
 
-        opponentEgo = caracs.ego
-        opponentMainStat = caracs[`carac${opponentClass}`]
-        opponentScndStat = caracs[`carac${classRelationships[opponentClass].s}`]
-        opponentTertStat = caracs[`carac${classRelationships[opponentClass].t}`]
-        opponentEndurance = caracs.endurance
-        opponentAtk = caracs.damage
-        opponentHarmony = caracs.chance
-        opponentDef = caracs.defense
+        if (caracs) {
+            opponentEgo = caracs.ego
+            opponentMainStat = caracs[`carac${opponentClass}`]
+            opponentScndStat = caracs[`carac${classRelationships[opponentClass].s}`]
+            opponentTertStat = caracs[`carac${classRelationships[opponentClass].t}`]
+            opponentEndurance = caracs.endurance
+            opponentAtk = caracs.damage
+            opponentHarmony = caracs.chance
+            opponentDef = caracs.defense
+        } else {
+            opponentEgo = playerLeaguesData.total_ego
+            opponentMainStat = playerLeaguesData[`carac${opponentClass}`]
+            opponentScndStat = playerLeaguesData[`carac${classRelationships[opponentClass].s}`]
+            opponentTertStat = playerLeaguesData[`carac${classRelationships[opponentClass].t}`]
+            opponentEndurance = playerLeaguesData.endurance
+            opponentAtk = playerLeaguesData.damage
+            opponentHarmony = playerLeaguesData.chance
+            opponentDef = playerLeaguesData.defense
+        }
         isEstimate = false
 
-        opponentGirlSum = playerLeaguesData.totalPower || playerLeaguesData.total_power
+        opponentGirlSum = playerLeaguesData.total_power || (playerLeaguesData.team && playerLeaguesData.team.total_power)
 
         const {team} = playerLeaguesData
-        const opponentTeamMemberElements = [];
-        [0,1,2,3,4,5,6].forEach(key => {
-            const teamMember = team[key]
-            if (teamMember && teamMember.element) {
-                opponentTeamMemberElements.push(teamMember.element)
+        if (team.synergies) {
+            const {synergies} = team
+            opponentBonuses = {
+                attack: findBonusFromSynergies(synergies, 'darkness'),
+                defense: findBonusFromSynergies(synergies, 'light'),
+                harmony: findBonusFromSynergies(synergies, 'psychic'),
+                ego: findBonusFromSynergies(synergies, 'nature'),
             }
-        })
-        opponentBonuses = calculateSynergiesFromTeamMemberElements(opponentTeamMemberElements)
+        } else {
+            const opponentTeamMemberElements = [];
+            [0,1,2,3,4,5,6].forEach(key => {
+                const teamMember = team[key]
+                if (teamMember && teamMember.element) {
+                    opponentTeamMemberElements.push(teamMember.element)
+                }
+            })
+            opponentBonuses = calculateSynergiesFromTeamMemberElements(opponentTeamMemberElements)
+        }
 
         if (!opponentMainStat) {
             opponentMainStat = Math.ceil((opponentAtk/(1+opponentBonuses.attack)) - (opponentGirlSum * 0.25))

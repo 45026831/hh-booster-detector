@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.8
+// @version         0.1.9
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -20,6 +20,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.9: Reversing sun and dominance attack bonuses to fix base stat estimates
 // 0.1.8: Pre-empting change to playerLeaguesData currently being tested on TS. Using now-exposed opponent synergies to improve accuracy.
 // 0.1.7: Applying the club bonus to harem level, fixing rainbow stat per level magic number
 // 0.1.6: Emergency fixes for camelCase vars renamed to snake_case
@@ -148,6 +149,37 @@ function findBonusFromSynergies(synergies, element) {
     return bonus_multiplier
 }
 
+const ELEMENTS = {
+    egoDamage: {
+        fire: 'nature',
+        nature: 'stone',
+        stone: 'sun',
+        sun: 'water',
+        water: 'fire'
+    }
+}
+function calculateDominationBonuses(playerElements, opponentElements) {
+    const bonuses = {
+        opponent: {
+            ego: 0,
+            attack: 0,
+        }
+    };
+
+    [
+        {a: opponentElements, b: playerElements, k: 'opponent'}
+    ].forEach(({a,b,k})=>{
+        a.forEach(element => {
+            if (ELEMENTS.egoDamage[element] && b.includes(ELEMENTS.egoDamage[element])) {
+                bonuses[k].ego += 0.1
+                bonuses[k].attack += 0.1
+            }
+        })
+    })
+
+    return bonuses
+}
+
 if (currentPage.includes('tower-of-fame')) {
     boosterModule()
 }
@@ -177,9 +209,11 @@ function boosterModule () {
     let $egoMobile
     let $defenseMobile
     let $harmonyMobile
+    let ownDefenseReductionAdjustment = 0
+    let attackDominanceBonusAdjustment = 0
 
     function getStats() {
-        const {playerLeaguesData} = window
+        const {playerLeaguesData, heroLeaguesData} = window
 
         opponentHasClub = !!(playerLeaguesData.club && playerLeaguesData.club.id_club)
         opponentLvl = parseInt(playerLeaguesData.level, 10)
@@ -210,6 +244,7 @@ function boosterModule () {
 
         opponentGirlSum = playerLeaguesData.total_power || (playerLeaguesData.team && playerLeaguesData.team.total_power)
 
+
         const {team} = playerLeaguesData
         if (team.synergies) {
             const {synergies} = team
@@ -219,6 +254,11 @@ function boosterModule () {
                 harmony: findBonusFromSynergies(synergies, 'psychic'),
                 ego: findBonusFromSynergies(synergies, 'nature'),
             }
+            ownDefenseReductionAdjustment = findBonusFromSynergies(heroLeaguesData.team.synergies, 'sun')
+
+            const [heroTheme, opponentTheme] = [heroLeaguesData, playerLeaguesData].map(data=>data.team.theme_elements.map(({type})=>type))
+            const dominanceBonuses = calculateDominationBonuses(heroTheme, opponentTheme)
+            attackDominanceBonusAdjustment = dominanceBonuses.opponent.attack
         } else {
             const opponentTeamMemberElements = [];
             [0,1,2,3,4,5,6].forEach(key => {
@@ -231,12 +271,12 @@ function boosterModule () {
         }
 
         if (!opponentMainStat) {
-            opponentMainStat = Math.ceil((opponentAtk/(1+opponentBonuses.attack)) - (opponentGirlSum * 0.25))
+            opponentMainStat = Math.ceil(((opponentAtk/(1+attackDominanceBonusAdjustment))/(1+opponentBonuses.attack)) - (opponentGirlSum * 0.25))
             isEstimate = true
         }
 
         if (!opponentScndStat) {
-            opponentNonMainStatSum = ((opponentDef/(1+opponentBonuses.defense)) - (opponentGirlSum * 0.12)) * 4
+            opponentNonMainStatSum = (((opponentDef/(1-ownDefenseReductionAdjustment))/(1+opponentBonuses.defense)) - (opponentGirlSum * 0.12)) * 4
             isEstimate = true
         } else {
             opponentNonMainStatSum = opponentScndStat + opponentTertStat
@@ -374,7 +414,7 @@ function boosterModule () {
             expectedAttack = Math.ceil(expectedUnrounded)
         } else {
             const expectedMainStat = estimateUnboostedPrimaryStatForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
-            expectedAttack = Math.ceil((expectedMainStat + (0.25 * opponentGirlSum)) * (1 + opponentBonuses.attack))
+            expectedAttack = Math.ceil((expectedMainStat + (0.25 * opponentGirlSum)) * (1 + opponentBonuses.attack) * (1 + attackDominanceBonusAdjustment))
         }
         const extraPercent = calculateExtraPercent(expectedAttack, opponentAtk)
 

@@ -145,7 +145,36 @@ ${extraPercent > 0 ? `Extra: ${extraPercent}%` : ''}
 `
 
 function findBonusFromSynergies(synergies, element) {
-    const {bonus_multiplier} = synergies.find(({element: {type}})=>type===element)
+    const {bonus_multiplier, team_bonus_per_girl} = synergies.find(({element: {type}})=>type===element)
+
+    let team_girls=0;
+    for (var i=0;i<playerLeaguesData.team.synergies.length;i++) {
+        team_girls+=playerLeaguesData.team.synergies[i].team_girls_count;
+    }
+    if(team_girls !== playerLeaguesData.team.girls.length) {
+        console.log("team girl counts missing")
+        const {team} = playerLeaguesData
+        const opponentTeamMemberElements = [];
+        [0,1,2,3,4,5,6].forEach(key => {
+            const teamMember = team.girls[key]
+            if (teamMember && teamMember.element) {
+                opponentTeamMemberElements.push(teamMember.element)
+            }
+        })
+        const counts = opponentTeamMemberElements.reduce((a,b)=>{a[b]++;return a}, {
+            fire: 0,
+            stone: 0,
+            sun: 0,
+            water: 0,
+            nature: 0,
+            darkness: 0,
+            light: 0,
+            psychic: 0
+        })
+
+        return bonus_multiplier + counts[element]*team_bonus_per_girl
+    }
+
     return bonus_multiplier
 }
 
@@ -243,8 +272,7 @@ function boosterModule () {
         isEstimate = false
 
         opponentGirlSum = playerLeaguesData.total_power || (playerLeaguesData.team && playerLeaguesData.team.total_power)
-
-
+        console.log()
         const {team} = playerLeaguesData
         if (team.synergies) {
             const {synergies} = team
@@ -369,7 +397,7 @@ function boosterModule () {
             light: 0,
             psychic: 0
         })
-    
+
         // Only care about those included in the stats: darkness, light, psychic, nature
         // Assume max harem synergy
         return {
@@ -451,7 +479,7 @@ function boosterModule () {
         if(LOGS_ENABLED) console.log(`GINSENG CHECK: Expected: ${isEstimate ? expectedNonMainStatSum : expectedMainStat}, Actual: ${isEstimate ? opponentNonMainStatSum : opponentMainStat}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
         const existingTooltip = $defense.attr('hh_title')
         const newTooltip = buildResultTooltip(
-            existingTooltip, 
+            existingTooltip,
             isEstimate ? [`class${classRelationships[opponentClass].s}`, `class${classRelationships[opponentClass].t}`] : [`class${opponentClass}`],
             isEstimate ? expectedNonMainStatSum * getClubBonus(opponentHasClub) : expectedMainStat,
             isEstimate ? opponentNonMainStatSum : opponentMainStat,

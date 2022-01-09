@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.9
+// @version         0.1.10
 // @match           https://www.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://eroges.hentaiheroes.com/*
@@ -20,6 +20,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.10: re added team girl counts when missing
 // 0.1.9: Reversing sun and dominance attack bonuses to fix base stat estimates
 // 0.1.8: Pre-empting change to playerLeaguesData currently being tested on TS. Using now-exposed opponent synergies to improve accuracy.
 // 0.1.7: Applying the club bonus to harem level, fixing rainbow stat per level magic number
@@ -144,38 +145,10 @@ const buildResultTooltip = (existingContent, caracs, expected, actual, extraPerc
 ${extraPercent > 0 ? `Extra: ${extraPercent}%` : ''}
 `
 
-function findBonusFromSynergies(synergies, element) {
+function findBonusFromSynergies(synergies, element, teamGirlSynergyBonusesMissing, counts) {
     const {bonus_multiplier, team_bonus_per_girl} = synergies.find(({element: {type}})=>type===element)
 
-    let team_girls=0;
-    for (var i=0;i<playerLeaguesData.team.synergies.length;i++) {
-        team_girls+=playerLeaguesData.team.synergies[i].team_girls_count;
-    }
-    if(team_girls !== playerLeaguesData.team.girls.length) {
-        console.log("team girl counts missing")
-        const {team} = playerLeaguesData
-        const opponentTeamMemberElements = [];
-        [0,1,2,3,4,5,6].forEach(key => {
-            const teamMember = team.girls[key]
-            if (teamMember && teamMember.element) {
-                opponentTeamMemberElements.push(teamMember.element)
-            }
-        })
-        const counts = opponentTeamMemberElements.reduce((a,b)=>{a[b]++;return a}, {
-            fire: 0,
-            stone: 0,
-            sun: 0,
-            water: 0,
-            nature: 0,
-            darkness: 0,
-            light: 0,
-            psychic: 0
-        })
-
-        return bonus_multiplier + counts[element]*team_bonus_per_girl
-    }
-
-    return bonus_multiplier
+    return bonus_multiplier + (teamGirlSynergyBonusesMissing ? counts[element]*team_bonus_per_girl : 0)
 }
 
 const ELEMENTS = {
@@ -271,32 +244,42 @@ function boosterModule () {
         }
         isEstimate = false
 
-        opponentGirlSum = playerLeaguesData.total_power || (playerLeaguesData.team && playerLeaguesData.team.total_power)
-        console.log()
         const {team} = playerLeaguesData
-        if (team.synergies) {
-            const {synergies} = team
-            opponentBonuses = {
-                attack: findBonusFromSynergies(synergies, 'darkness'),
-                defense: findBonusFromSynergies(synergies, 'light'),
-                harmony: findBonusFromSynergies(synergies, 'psychic'),
-                ego: findBonusFromSynergies(synergies, 'nature'),
-            }
-            ownDefenseReductionAdjustment = findBonusFromSynergies(heroLeaguesData.team.synergies, 'sun')
+        const {synergies, total_power} = team
+        opponentGirlSum = total_power
 
-            const [heroTheme, opponentTheme] = [heroLeaguesData, playerLeaguesData].map(data=>data.team.theme_elements.map(({type})=>type))
-            const dominanceBonuses = calculateDominationBonuses(heroTheme, opponentTheme)
-            attackDominanceBonusAdjustment = dominanceBonuses.opponent.attack
-        } else {
+        const teamGirlSynergyBonusesMissing = synergies.every(({team_girls_count}) => !team_girls_count)
+        let counts
+        if (teamGirlSynergyBonusesMissing) {
             const opponentTeamMemberElements = [];
             [0,1,2,3,4,5,6].forEach(key => {
-                const teamMember = team[key]
+                const teamMember = team.girls[key]
                 if (teamMember && teamMember.element) {
                     opponentTeamMemberElements.push(teamMember.element)
                 }
             })
-            opponentBonuses = calculateSynergiesFromTeamMemberElements(opponentTeamMemberElements)
+            counts = opponentTeamMemberElements.reduce((a,b)=>{a[b]++;return a}, {
+                fire: 0,
+                stone: 0,
+                sun: 0,
+                water: 0,
+                nature: 0,
+                darkness: 0,
+                light: 0,
+                psychic: 0
+            })
         }
+        opponentBonuses = {
+            attack: findBonusFromSynergies(synergies, 'darkness', teamGirlSynergyBonusesMissing, counts),
+            defense: findBonusFromSynergies(synergies, 'light', teamGirlSynergyBonusesMissing, counts),
+            harmony: findBonusFromSynergies(synergies, 'psychic', teamGirlSynergyBonusesMissing, counts),
+            ego: findBonusFromSynergies(synergies, 'nature', teamGirlSynergyBonusesMissing, counts),
+        }
+        ownDefenseReductionAdjustment = findBonusFromSynergies(heroLeaguesData.team.synergies, 'sun')
+
+        const [heroTheme, opponentTheme] = [heroLeaguesData, playerLeaguesData].map(data=>data.team.theme_elements.map(({type})=>type))
+        const dominanceBonuses = calculateDominationBonuses(heroTheme, opponentTheme)
+        attackDominanceBonusAdjustment = dominanceBonuses.opponent.attack
 
         if (!opponentMainStat) {
             opponentMainStat = Math.ceil(((opponentAtk/(1+attackDominanceBonusAdjustment))/(1+opponentBonuses.attack)) - (opponentGirlSum * 0.25))
@@ -384,28 +367,6 @@ function boosterModule () {
             ${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].t}"/> ${opponentTertStat.toLocaleString(locale)}`)
         $ego.attr('hh_title', `${existingEgoTooltip}<br/>${isEstimate ? 'Estimate ':''}<span carac="endurance"/> ${opponentEndurance.toLocaleString(locale)}`)
         $harmony.attr('hh_title', existingHarmonyTooltip)
-    }
-
-    function calculateSynergiesFromTeamMemberElements(elements) {
-        const counts = elements.reduce((a,b)=>{a[b]++;return a}, {
-            fire: 0,
-            stone: 0,
-            sun: 0,
-            water: 0,
-            nature: 0,
-            darkness: 0,
-            light: 0,
-            psychic: 0
-        })
-
-        // Only care about those included in the stats: darkness, light, psychic, nature
-        // Assume max harem synergy
-        return {
-            attack:  (0.0007 * 100) + (0.02 * counts.darkness),
-            defense: (0.0007 * 100) + (0.02 * counts.light),
-            harmony: (0.0007 * 100) + (0.02 * counts.psychic),
-            ego:     (0.001  * 100) + (0.03 * counts.nature)
-        }
     }
 
     function checkChlorella () {

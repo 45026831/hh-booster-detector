@@ -1,15 +1,14 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.10
-// @match           https://www.hentaiheroes.com/*
+// @version         0.1.11
+// @match           https://*.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
-// @match           https://eroges.hentaiheroes.com/*
-// @match           https://thrix.hentaiheroes.com/*
-// @match           https://test.hentaiheroes.com/*
 // @match           https://www.gayharem.com/*
 // @match           https://nutaku.gayharem.com/*
 // @match           https://*.comixharem.com/*
+// @match           https://*.hornyheroes.com/*
+// @match           https://*.pornstarharem.com/*
 // @run-at          document-end
 // @updateURL       https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
 // @downloadURL     https://raw.githubusercontent.com/45026831/hh-booster-detector/main/hh-booster-detector.js
@@ -20,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.11: Adding PSH matcher for Weds official release
 // 0.1.10: re added team girl counts when missing
 // 0.1.9: Reversing sun and dominance attack bonuses to fix base stat estimates
 // 0.1.8: Pre-empting change to playerLeaguesData currently being tested on TS. Using now-exposed opponent synergies to improve accuracy.

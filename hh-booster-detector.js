@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.11
+// @version         0.1.12
 // @match           https://*.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://www.gayharem.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.12: Fixing ego check after game update
 // 0.1.11: Adding PSH matcher for Weds official release
 // 0.1.10: re added team girl counts when missing
 // 0.1.9: Reversing sun and dominance attack bonuses to fix base stat estimates
@@ -233,7 +234,7 @@ function boosterModule () {
             opponentHarmony = caracs.chance
             opponentDef = caracs.defense
         } else {
-            opponentEgo = playerLeaguesData.total_ego
+            opponentEgo = playerLeaguesData.total_ego || playerLeaguesData.remaining_ego
             opponentMainStat = playerLeaguesData[`carac${opponentClass}`]
             opponentScndStat = playerLeaguesData[`carac${classRelationships[opponentClass].s}`]
             opponentTertStat = playerLeaguesData[`carac${classRelationships[opponentClass].t}`]

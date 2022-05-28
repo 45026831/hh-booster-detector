@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.12
+// @version         0.1.13
 // @match           https://*.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://www.gayharem.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.13: Taking ego dominance bonus into account now that it's incuded in the opponent's stats
 // 0.1.12: Fixing ego check after game update
 // 0.1.11: Adding PSH matcher for Weds official release
 // 0.1.10: re added team girl counts when missing
@@ -214,6 +215,7 @@ function boosterModule () {
     let $harmonyMobile
     let ownDefenseReductionAdjustment = 0
     let attackDominanceBonusAdjustment = 0
+    let egoDominanceBonusAdjustment = 0
 
     function getStats() {
         const {playerLeaguesData, heroLeaguesData} = window
@@ -281,6 +283,7 @@ function boosterModule () {
         const [heroTheme, opponentTheme] = [heroLeaguesData, playerLeaguesData].map(data=>data.team.theme_elements.map(({type})=>type))
         const dominanceBonuses = calculateDominationBonuses(heroTheme, opponentTheme)
         attackDominanceBonusAdjustment = dominanceBonuses.opponent.attack
+        egoDominanceBonusAdjustment = dominanceBonuses.opponent.ego
 
         if (!opponentMainStat) {
             opponentMainStat = Math.ceil(((opponentAtk/(1+attackDominanceBonusAdjustment))/(1+opponentBonuses.attack)) - (opponentGirlSum * 0.25))
@@ -294,7 +297,7 @@ function boosterModule () {
             opponentNonMainStatSum = opponentScndStat + opponentTertStat
         }
         if (!opponentEndurance) {
-            opponentEndurance = Math.ceil((opponentEgo/(1+opponentBonuses.ego)) - (opponentGirlSum * 2))
+            opponentEndurance = Math.ceil(((opponentEgo/1+egoDominanceBonusAdjustment)/(1+opponentBonuses.ego)) - (opponentGirlSum * 2))
             isEstimate = true
         }
 
@@ -377,7 +380,7 @@ function boosterModule () {
             expectedEgo = opponentEndurance + (2 * opponentGirlSum)
         } else {
             const expectedEndurance = estimateUnboostedEnduranceForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
-            expectedEgo = Math.ceil((expectedEndurance + (2 * opponentGirlSum)) * (1 + opponentBonuses.ego))
+            expectedEgo = Math.ceil((expectedEndurance + (2 * opponentGirlSum)) * (1 + opponentBonuses.ego) * (1 + egoDominanceBonusAdjustment))
         }
         const extraPercent = calculateExtraPercent(expectedEgo, opponentEgo)
 

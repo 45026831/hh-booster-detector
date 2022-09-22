@@ -113,6 +113,7 @@ const LEGENDARY_CHLORELLA    = 10
 const LEGENDARY_CORDYCEPS    = 10
 const LEGENDARY_GINSENG      = 6
 const LEGENDARY_JUJUBES      = 20
+const GIRLS_PER_LEVEL_CAP    = [0,0,0,0,0,20,25,30,35,40,50,60,70,85,100]
 
 const boundMonostatCount = (count) => Math.max(MIN_POTENTIAL_MONOSTAT, Math.min(MAX_POTENTIAL_MONOSTAT, count))
 const getClubBonus = (hasClub, multiplier = 1) => hasClub ? 1 + (0.1*multiplier) : 1
@@ -120,7 +121,7 @@ const estimateUnboostedEnduranceForLevel = (level, monostatCount, hasClub) => {
     const basePrimary = basePrimaryStatForLevel(level)
     const equipPrimary = equipPrimaryStatForLevel(level, monostatCount)
     const equipEndurance = rainbowStatForLevel(level, 6-monostatCount)
-    const haremBonus = estimateHaremBonusForLevel(level)
+    const haremBonus = caculateHaremBonus(estimateHaremLevel(level))
     const clubBonus = getClubBonus(hasClub)
     const comboClubBonus = getClubBonus(hasClub, 2)
 
@@ -136,6 +137,7 @@ const monostatStatForLevel = (level, count) => level * (count*MONOSTAT_PER_LEVEL
 const estimateUnboostedPrimaryStatForLevel = (level, monostatCount, hasClub) =>
     (basePrimaryStatForLevel(level) + equipPrimaryStatForLevel(level, monostatCount)) * getClubBonus(hasClub)
 const estimateHaremBonusForLevel = (level) => level * HAREM_BONUS_PER_LVL
+const caculateHaremBonus = (haremLevel) => Math.round(Math.sqrt(haremLevel)*50)
 const calculateExtraPercent = (expected, actual) => Math.round(((actual - expected) / expected) * 100)
 const buildResultTooltip = (existingContent, caracs, expected, actual, extraPercent) =>
 `${existingContent ? existingContent : ''}
@@ -146,6 +148,31 @@ const buildResultTooltip = (existingContent, caracs, expected, actual, extraPerc
 </table>
 ${extraPercent > 0 ? `Extra: ${extraPercent}%` : ''}
 `
+
+function estimateHaremLevel (level) {
+    const teamLevels = playerLeaguesData.team.girls.map(({level})=>level)
+    const teamLevel = teamLevels.reduce((a,b) => a+b, 0)
+    const teamCount = teamLevels.length
+    const girlsCount = playerLeaguesData.team.synergies.map(({harem_girls_count})=>harem_girls_count).reduce((a,b) => a+b, 0)
+
+    if (girlsCount<=7) {
+        if (girlsCount == teamCount) {
+            return teamLevel
+        } else {
+            return girlsCount * (teamLevel/teamCount)
+        }
+    } else {
+        const levelCap = Math.ceil(Math.max(...teamLevels)/50)*50
+        const min_girls = GIRLS_PER_LEVEL_CAP[levelCap/50-1]
+
+        if (levelCap<=250 || (levelCap == 350 && girlsCount<min_girls)) {
+            return girlsCount * (teamLevel/teamCount)
+        } else {
+            let bias = teamLevels.reduce((a,b) => a+(b-(levelCap-50)), 0)
+            return Math.min((min_girls*(levelCap-50)) + (0.5*level*girlsCount) + bias, levelCap*girlsCount)
+        }
+    }
+}
 
 function findBonusFromSynergies(synergies, element, teamGirlSynergyBonusesMissing, counts) {
     const {bonus_multiplier, team_bonus_per_girl} = synergies.find(({element: {type}})=>type===element)

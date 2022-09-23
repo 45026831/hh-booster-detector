@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.13
+// @version         0.1.14
 // @match           https://*.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://www.gayharem.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.1.14: Improving harem endurance bonus calculation now that the game calculates it properly
 // 0.1.13: Taking ego dominance bonus into account now that it's incuded in the opponent's stats
 // 0.1.12: Fixing ego check after game update
 // 0.1.11: Adding PSH matcher for Weds official release

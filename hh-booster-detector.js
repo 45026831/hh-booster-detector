@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.1.14
+// @version         0.2.0
 // @match           https://*.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://www.gayharem.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.2.0: Changing stat collection to work with mythic items
 // 0.1.14: Improving harem endurance bonus calculation now that the game calculates it properly
 // 0.1.13: Taking ego dominance bonus into account now that it's incuded in the opponent's stats
 // 0.1.12: Fixing ego check after game update
@@ -53,7 +54,7 @@
 // 0.0.1: Initial version. Adding detection for Chlorella and Cordyceps
 
 // Define jQuery
-const {$, location} = window;
+const { $, location } = window;
 const LOGS_ENABLED = false
 
 if (!$) {
@@ -62,7 +63,7 @@ if (!$) {
 }
 
 // Define CSS
-const sheet = (function() {
+const sheet = (function () {
     const style = document.createElement('style')
     document.head.appendChild(style)
     return style.sheet
@@ -88,7 +89,7 @@ const classRelationships = {
     }
 }
 
-const lang = $('html')[0].lang.substring(0,2)
+const lang = $('html')[0].lang.substring(0, 2)
 let locale = 'fr'
 if (lang === 'en') {
     locale = 'en'
@@ -97,31 +98,31 @@ if (lang === 'en') {
 // Magic numbers
 const RAINBOW_STAT_PER_LEVEL = 7
 const RAINBOW_HARM_PER_LEVEL = 9.1
-const RAINBOW_HARM_BASE      = 90
-const MONOSTAT_PER_LEVEL     = 11.15
-const PRIMARY_PER_LEVEL      = 9+30
-const SECONDARY_PER_LEVEL    = 7+30
-const TERTIARY_PER_LEVEL     = 5+30
-const ENDURANCE_PER_PRIMARY  = 4
-const DEFENCE_PER_NON_PRIM   = 0.25
-const HARMONY_PER_NON_PRIM   = 0.5
+const RAINBOW_HARM_BASE = 90
+const MONOSTAT_PER_LEVEL = 11.15
+const PRIMARY_PER_LEVEL = 9 + 30
+const SECONDARY_PER_LEVEL = 7 + 30
+const TERTIARY_PER_LEVEL = 5 + 30
+const ENDURANCE_PER_PRIMARY = 4
+const DEFENCE_PER_NON_PRIM = 0.25
+const HARMONY_PER_NON_PRIM = 0.5
 const MIN_POTENTIAL_MONOSTAT = 0
 const MAX_POTENTIAL_MONOSTAT = 6
-const HAREM_BONUS_PER_LVL    = 52
-const RAINBOW_MONO_DIFF      = MONOSTAT_PER_LEVEL - RAINBOW_STAT_PER_LEVEL
+const HAREM_BONUS_PER_LVL = 52
+const RAINBOW_MONO_DIFF = MONOSTAT_PER_LEVEL - RAINBOW_STAT_PER_LEVEL
 const FULL_RAINBOW_PER_LEVEL = 6 * RAINBOW_STAT_PER_LEVEL
-const LEGENDARY_CHLORELLA    = 10
-const LEGENDARY_CORDYCEPS    = 10
-const LEGENDARY_GINSENG      = 6
-const LEGENDARY_JUJUBES      = 20
-const GIRLS_PER_LEVEL_CAP    = [0,0,0,0,0,20,25,30,35,40,50,60,70,85,100]
+const LEGENDARY_CHLORELLA = 10
+const LEGENDARY_CORDYCEPS = 10
+const LEGENDARY_GINSENG = 6
+const LEGENDARY_JUJUBES = 20
+const GIRLS_PER_LEVEL_CAP = [0, 0, 0, 0, 0, 20, 25, 30, 35, 40, 50, 60, 70, 85, 100]
 
 const boundMonostatCount = (count) => Math.max(MIN_POTENTIAL_MONOSTAT, Math.min(MAX_POTENTIAL_MONOSTAT, count))
-const getClubBonus = (hasClub, multiplier = 1) => hasClub ? 1 + (0.1*multiplier) : 1
-const estimateUnboostedEnduranceForLevel = (level, monostatCount, hasClub) => {
+const getClubBonus = (hasClub, multiplier = 1) => hasClub ? 1 + (0.1 * multiplier) : 1
+const estimateUnboostedEnduranceForLevel = (level, monostatCount, hasClub, equipCaracs, opponentClass) => {
     const basePrimary = basePrimaryStatForLevel(level)
-    const equipPrimary = equipPrimaryStatForLevel(level, monostatCount)
-    const equipEndurance = rainbowStatForLevel(level, 6-monostatCount)
+    const equipPrimary = equipCaracs ? equipCaracs[`carac${opponentClass}`] : equipPrimaryStatForLevel(level, monostatCount)
+    const equipEndurance = equipCaracs ? equipCaracs.endurance : rainbowStatForLevel(level, 6 - monostatCount)
     const haremBonus = caculateHaremBonus(estimateHaremLevel(level))
     const clubBonus = getClubBonus(hasClub)
     const comboClubBonus = getClubBonus(hasClub, 2)
@@ -132,16 +133,16 @@ const estimateUnboostedEnduranceForLevel = (level, monostatCount, hasClub) => {
         haremBonus * clubBonus
 }
 const basePrimaryStatForLevel = (level) => level * PRIMARY_PER_LEVEL
-const equipPrimaryStatForLevel = (level, monostatCount) => rainbowStatForLevel(level, 6-monostatCount) + monostatStatForLevel(level, monostatCount)
-const rainbowStatForLevel = (level, count) => level * (count*RAINBOW_STAT_PER_LEVEL)
-const monostatStatForLevel = (level, count) => level * (count*MONOSTAT_PER_LEVEL)
-const estimateUnboostedPrimaryStatForLevel = (level, monostatCount, hasClub) =>
-    (basePrimaryStatForLevel(level) + equipPrimaryStatForLevel(level, monostatCount)) * getClubBonus(hasClub)
+const equipPrimaryStatForLevel = (level, monostatCount) => rainbowStatForLevel(level, 6 - monostatCount) + monostatStatForLevel(level, monostatCount)
+const rainbowStatForLevel = (level, count) => level * (count * RAINBOW_STAT_PER_LEVEL)
+const monostatStatForLevel = (level, count) => level * (count * MONOSTAT_PER_LEVEL)
+const estimateUnboostedPrimaryStatForLevel = (level, monostatCount, hasClub, equipCaracs, opponentClass) =>
+    (basePrimaryStatForLevel(level) + (equipCaracs ? equipCaracs[`carac${opponentClass}`] : equipPrimaryStatForLevel(level, monostatCount))) * getClubBonus(hasClub)
 const estimateHaremBonusForLevel = (level) => level * HAREM_BONUS_PER_LVL
-const caculateHaremBonus = (haremLevel) => Math.round(Math.sqrt(haremLevel)*50)
+const caculateHaremBonus = (haremLevel) => Math.round(Math.sqrt(haremLevel) * 50)
 const calculateExtraPercent = (expected, actual) => Math.round(((actual - expected) / expected) * 100)
 const buildResultTooltip = (existingContent, caracs, expected, actual, extraPercent) =>
-`${existingContent ? existingContent : ''}
+    `${existingContent ? existingContent : ''}
 <hr/>
 <table>
 <tr><td>Expected ${caracs.map(carac => `<span carac="${carac}"/>`).join('+')}:</td><td>${Math.round(expected).toLocaleString(locale)}</td></tr>
@@ -150,35 +151,35 @@ const buildResultTooltip = (existingContent, caracs, expected, actual, extraPerc
 ${extraPercent > 0 ? `Extra: ${extraPercent}%` : ''}
 `
 
-function estimateHaremLevel (level) {
-    const teamLevels = playerLeaguesData.team.girls.map(({level})=>level)
-    const teamLevel = teamLevels.reduce((a,b) => a+b, 0)
+function estimateHaremLevel(level) {
+    const teamLevels = playerLeaguesData.team.girls.map(({ level }) => level)
+    const teamLevel = teamLevels.reduce((a, b) => a + b, 0)
     const teamCount = teamLevels.length
-    const girlsCount = playerLeaguesData.team.synergies.map(({harem_girls_count})=>harem_girls_count).reduce((a,b) => a+b, 0)
+    const girlsCount = playerLeaguesData.team.synergies.map(({ harem_girls_count }) => harem_girls_count).reduce((a, b) => a + b, 0)
 
-    if (girlsCount<=7) {
+    if (girlsCount <= 7) {
         if (girlsCount == teamCount) {
             return teamLevel
         } else {
-            return girlsCount * (teamLevel/teamCount)
+            return girlsCount * (teamLevel / teamCount)
         }
     } else {
-        const levelCap = Math.ceil(Math.max(...teamLevels)/50)*50
-        const min_girls = GIRLS_PER_LEVEL_CAP[levelCap/50-1]
+        const levelCap = Math.ceil(Math.max(...teamLevels) / 50) * 50
+        const min_girls = GIRLS_PER_LEVEL_CAP[levelCap / 50 - 1]
 
-        if (levelCap<=250 || (levelCap == 350 && girlsCount<min_girls)) {
-            return girlsCount * (teamLevel/teamCount)
+        if (levelCap <= 250 || (levelCap == 350 && girlsCount < min_girls)) {
+            return girlsCount * (teamLevel / teamCount)
         } else {
-            let bias = teamLevels.reduce((a,b) => a+(b-(levelCap-50)), 0)
-            return Math.min((min_girls*(levelCap-50)) + (0.5*level*girlsCount) + bias, levelCap*girlsCount)
+            let bias = teamLevels.reduce((a, b) => a + (b - (levelCap - 50)), 0)
+            return Math.min((min_girls * (levelCap - 50)) + (0.5 * level * girlsCount) + bias, levelCap * girlsCount)
         }
     }
 }
 
 function findBonusFromSynergies(synergies, element, teamGirlSynergyBonusesMissing, counts) {
-    const {bonus_multiplier, team_bonus_per_girl} = synergies.find(({element: {type}})=>type===element)
+    const { bonus_multiplier, team_bonus_per_girl } = synergies.find(({ element: { type } }) => type === element)
 
-    return bonus_multiplier + (teamGirlSynergyBonusesMissing ? counts[element]*team_bonus_per_girl : 0)
+    return bonus_multiplier + (teamGirlSynergyBonusesMissing ? counts[element] * team_bonus_per_girl : 0)
 }
 
 const ELEMENTS = {
@@ -199,8 +200,8 @@ function calculateDominationBonuses(playerElements, opponentElements) {
     };
 
     [
-        {a: opponentElements, b: playerElements, k: 'opponent'}
-    ].forEach(({a,b,k})=>{
+        { a: opponentElements, b: playerElements, k: 'opponent' }
+    ].forEach(({ a, b, k }) => {
         a.forEach(element => {
             if (ELEMENTS.egoDamage[element] && b.includes(ELEMENTS.egoDamage[element])) {
                 bonuses[k].ego += 0.1
@@ -212,11 +213,41 @@ function calculateDominationBonuses(playerElements, opponentElements) {
     return bonuses
 }
 
+async function getEquipDataFromProfile(playerId) {
+    const html = await new Promise((res) => {
+        window.$.ajax({
+            url: `/hero/${playerId}/profile.html`,
+            success: res
+        })
+    })
+
+    const $page = $(html)
+
+    const equips = []
+    const stats = {}
+
+    $page.find('.hero_items .slot-container .slot').each((i, el) => {
+        const $slot = $(el)
+        const data = $slot.data('d')
+        if (data) {
+            equips.push(data)
+        }
+    })
+
+    const CARAC_KEYS = ['1', '2', '3', 'endurance', 'chance']
+    CARAC_KEYS.forEach(carac => {
+        const caracVal = $page.find(`.fight_stats [carac=${carac}]`).text()
+        stats[carac] = +caracVal.replace(/[^0-9]/g, '')
+    })
+
+    return { equips, stats }
+}
+
 if (currentPage.includes('tower-of-fame')) {
     boosterModule()
 }
 
-function boosterModule () {
+function boosterModule() {
     let opponentLvl
     let opponentEgo
     let opponentMainStat
@@ -244,15 +275,19 @@ function boosterModule () {
     let ownDefenseReductionAdjustment = 0
     let attackDominanceBonusAdjustment = 0
     let egoDominanceBonusAdjustment = 0
+    let attackResonanceBonusAdjustment = 0
+    let egoResonanceBonusAdjustment = 0
+    let harmonyResonanceBonusAdjustment = 0
+    let equipCaracs
 
-    function getStats() {
-        const {playerLeaguesData, heroLeaguesData} = window
+    async function getStats() {
+        const { playerLeaguesData, heroLeaguesData } = window
 
         opponentHasClub = !!(playerLeaguesData.club && playerLeaguesData.club.id_club)
         opponentLvl = parseInt(playerLeaguesData.level, 10)
         opponentClass = playerLeaguesData.class
 
-        const {caracs} = playerLeaguesData
+        const { caracs } = playerLeaguesData
 
         if (caracs) {
             opponentEgo = caracs.ego
@@ -275,21 +310,23 @@ function boosterModule () {
         }
         isEstimate = false
 
-        const {team} = playerLeaguesData
-        const {synergies, total_power} = team
+        const { equips, stats } = await getEquipDataFromProfile(playerLeaguesData.id_fighter)
+
+        const { team } = playerLeaguesData
+        const { synergies, total_power } = team
         opponentGirlSum = total_power
 
-        const teamGirlSynergyBonusesMissing = synergies.every(({team_girls_count}) => !team_girls_count)
+        const teamGirlSynergyBonusesMissing = synergies.every(({ team_girls_count }) => !team_girls_count)
         let counts
         if (teamGirlSynergyBonusesMissing) {
             const opponentTeamMemberElements = [];
-            [0,1,2,3,4,5,6].forEach(key => {
+            [0, 1, 2, 3, 4, 5, 6].forEach(key => {
                 const teamMember = team.girls[key]
                 if (teamMember && teamMember.element) {
                     opponentTeamMemberElements.push(teamMember.element)
                 }
             })
-            counts = opponentTeamMemberElements.reduce((a,b)=>{a[b]++;return a}, {
+            counts = opponentTeamMemberElements.reduce((a, b) => { a[b]++; return a }, {
                 fire: 0,
                 stone: 0,
                 sun: 0,
@@ -308,24 +345,68 @@ function boosterModule () {
         }
         ownDefenseReductionAdjustment = findBonusFromSynergies(heroLeaguesData.team.synergies, 'sun')
 
-        const [heroTheme, opponentTheme] = [heroLeaguesData, playerLeaguesData].map(data=>data.team.theme_elements.map(({type})=>type))
+        const [heroTheme, opponentTheme] = [heroLeaguesData, playerLeaguesData].map(data => data.team.theme_elements.map(({ type }) => type))
         const dominanceBonuses = calculateDominationBonuses(heroTheme, opponentTheme)
+
+        const mythicEquipBonuses = {
+            damage: 0,
+            defense: 0,
+            chance: 0,
+            ego: 0,
+        }
+        equipCaracs = { carac1: 0, carac2: 0, carac3: 0, endurance: 0, chance: 0 }
+        const CARAC_KEYS = ['carac1', 'carac2', 'carac3', 'endurance', 'chance']
+        equips.forEach(equip => {
+            if (equip.resonance_bonuses) {
+                const { class: classBonus, theme } = equip.resonance_bonuses
+                const matchesClass = `${classBonus.identifier}` === `${opponentClass}`
+                if (matchesClass) {
+                    mythicEquipBonuses[classBonus.resonance] += (+classBonus.bonus / 100)
+                }
+
+                const matchesTheme = (theme.identifier && opponentTheme.includes(theme.identifier)) || (!theme.identifier && !opponentTheme.length)
+                if (matchesTheme) {
+                    mythicEquipBonuses[theme.resonance] += (+theme.bonus / 100)
+                }
+            }
+            CARAC_KEYS.forEach(caracKey => {
+                equipCaracs[caracKey] += +equip[`${caracKey}_equip`]
+            })
+        })
+        console.log('calculated mythic equip bonuses', mythicEquipBonuses)
+
+        rawHarmony = Math.ceil(stats.chance * (1 + opponentBonuses.harmony) * (1 + mythicEquipBonuses.chance))
+        console.log('profile harm', rawHarmony, 'page harm', opponentHarmony, '(synergy:', opponentBonuses.harmony, '; equips:', mythicEquipBonuses.chance, '; total:', opponentHarmony, ')')
+        const statsMatch = rawHarmony + 1 >= opponentHarmony && rawHarmony - 1 <= opponentHarmony
+        console.log('stats match?', statsMatch)
+        console.log('equip caracs', equipCaracs)
+
+        if (statsMatch) {
+            opponentMainStat = stats[opponentClass]
+            opponentScndStat = stats[classRelationships[opponentClass].s]
+            opponentTertStat = stats[classRelationships[opponentClass].t]
+            opponentEndurance = stats.endurance
+        }
+
         attackDominanceBonusAdjustment = dominanceBonuses.opponent.attack
         egoDominanceBonusAdjustment = dominanceBonuses.opponent.ego
+        attackResonanceBonusAdjustment = mythicEquipBonuses.damage
+        egoResonanceBonusAdjustment = mythicEquipBonuses.ego
+        harmonyResonanceBonusAdjustment = mythicEquipBonuses.chance
 
         if (!opponentMainStat) {
-            opponentMainStat = Math.ceil(((opponentAtk/(1+attackDominanceBonusAdjustment))/(1+opponentBonuses.attack)) - (opponentGirlSum * 0.25))
+            opponentMainStat = Math.ceil(((opponentAtk / (1 + attackDominanceBonusAdjustment)) / (1 + opponentBonuses.attack)) - (opponentGirlSum * 0.25))
             isEstimate = true
         }
 
         if (!opponentScndStat) {
-            opponentNonMainStatSum = (((opponentDef/(1-ownDefenseReductionAdjustment))/(1+opponentBonuses.defense)) - (opponentGirlSum * 0.12)) * 4
+            opponentNonMainStatSum = (((opponentDef / (1 - ownDefenseReductionAdjustment)) / (1 + opponentBonuses.defense)) - (opponentGirlSum * 0.12)) * 4
             isEstimate = true
         } else {
             opponentNonMainStatSum = opponentScndStat + opponentTertStat
         }
         if (!opponentEndurance) {
-            opponentEndurance = Math.ceil(((opponentEgo/1+egoDominanceBonusAdjustment)/(1+opponentBonuses.ego)) - (opponentGirlSum * 2))
+            opponentEndurance = Math.ceil(((opponentEgo / 1 + egoDominanceBonusAdjustment) / (1 + opponentBonuses.ego)) - (opponentGirlSum * 2))
             isEstimate = true
         }
 
@@ -333,21 +414,21 @@ function boosterModule () {
             const statRatio = opponentScndStat / opponentMainStat
 
             opponentMonostatCount = boundMonostatCount(Math.round(
-                ((SECONDARY_PER_LEVEL+FULL_RAINBOW_PER_LEVEL) - ((PRIMARY_PER_LEVEL+FULL_RAINBOW_PER_LEVEL) * statRatio))
+                ((SECONDARY_PER_LEVEL + FULL_RAINBOW_PER_LEVEL) - ((PRIMARY_PER_LEVEL + FULL_RAINBOW_PER_LEVEL) * statRatio))
                 /
                 ((RAINBOW_MONO_DIFF * statRatio) + RAINBOW_STAT_PER_LEVEL)
-                ))
+            ))
         } else {
             const statRatio = opponentNonMainStatSum / opponentMainStat
 
             const monostatCountFromAttack = Math.round(
-                ((TERTIARY_PER_LEVEL + SECONDARY_PER_LEVEL + (2*FULL_RAINBOW_PER_LEVEL))-((PRIMARY_PER_LEVEL+FULL_RAINBOW_PER_LEVEL) * statRatio))
+                ((TERTIARY_PER_LEVEL + SECONDARY_PER_LEVEL + (2 * FULL_RAINBOW_PER_LEVEL)) - ((PRIMARY_PER_LEVEL + FULL_RAINBOW_PER_LEVEL) * statRatio))
                 /
-                ((RAINBOW_MONO_DIFF * statRatio) + 2*RAINBOW_STAT_PER_LEVEL)
-                )
+                ((RAINBOW_MONO_DIFF * statRatio) + 2 * RAINBOW_STAT_PER_LEVEL)
+            )
             const monostatCountFromHarmony = Math.round(
                 MAX_POTENTIAL_MONOSTAT - (
-                    ((opponentHarmony/(1+opponentBonuses.harmony)) - opponentNonMainStatSum/2)
+                    ((opponentHarmony / (1 + opponentBonuses.harmony)) - opponentNonMainStatSum / 2)
                     /
                     ((RAINBOW_HARM_BASE + (opponentLvl * RAINBOW_HARM_PER_LEVEL)) * getClubBonus(opponentHasClub))
                 )
@@ -358,10 +439,10 @@ function boosterModule () {
             )
         }
 
-        if(!opponentScndStat && isEstimate) {
+        if (!opponentScndStat && isEstimate) {
             // Estimate sec and tert stats for display
-            const secPerLevel = (SECONDARY_PER_LEVEL+(RAINBOW_STAT_PER_LEVEL*(6-opponentMonostatCount)))
-            const tertPerLevel = (TERTIARY_PER_LEVEL+(RAINBOW_STAT_PER_LEVEL*(6-opponentMonostatCount)))
+            const secPerLevel = (SECONDARY_PER_LEVEL + (RAINBOW_STAT_PER_LEVEL * (6 - opponentMonostatCount)))
+            const tertPerLevel = (TERTIARY_PER_LEVEL + (RAINBOW_STAT_PER_LEVEL * (6 - opponentMonostatCount)))
             const secShare = secPerLevel / (secPerLevel + tertPerLevel)
             const tertShare = tertPerLevel / (secPerLevel + tertPerLevel)
 
@@ -391,28 +472,28 @@ function boosterModule () {
 
         $attack.attr('hh_title',
             `${existingAttackTooltip}<br/>
-            ${isEstimate ? 'Estimate ':''}<span carac="class${opponentClass}"/> ${opponentMainStat.toLocaleString(locale)}<br/>
+            ${isEstimate ? 'Estimate ' : ''}<span carac="class${opponentClass}"/> ${opponentMainStat.toLocaleString(locale)}<br/>
             Monostat count: ${opponentMonostatCount}`)
         $defense.attr('hh_title',
             `${existingDefenceTooltip}<br/>
-            ${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].s}"/> ${opponentScndStat.toLocaleString(locale)}<br/>
-            ${isEstimate ? 'Estimate ':''}<span carac="class${classRelationships[opponentClass].t}"/> ${opponentTertStat.toLocaleString(locale)}`)
-        $ego.attr('hh_title', `${existingEgoTooltip}<br/>${isEstimate ? 'Estimate ':''}<span carac="endurance"/> ${opponentEndurance.toLocaleString(locale)}`)
+            ${isEstimate ? 'Estimate ' : ''}<span carac="class${classRelationships[opponentClass].s}"/> ${opponentScndStat.toLocaleString(locale)}<br/>
+            ${isEstimate ? 'Estimate ' : ''}<span carac="class${classRelationships[opponentClass].t}"/> ${opponentTertStat.toLocaleString(locale)}`)
+        $ego.attr('hh_title', `${existingEgoTooltip}<br/>${isEstimate ? 'Estimate ' : ''}<span carac="endurance"/> ${opponentEndurance.toLocaleString(locale)}`)
         $harmony.attr('hh_title', existingHarmonyTooltip)
     }
 
-    function checkChlorella () {
+    function checkChlorella() {
         let expectedEgo
 
         if (!isEstimate) {
-            expectedEgo = opponentEndurance + (2 * opponentGirlSum)
+            expectedEgo = Math.ceil((opponentEndurance + (2 * opponentGirlSum)) * (1 + opponentBonuses.ego) * (1 + egoDominanceBonusAdjustment) * (1 + egoResonanceBonusAdjustment))
         } else {
-            const expectedEndurance = estimateUnboostedEnduranceForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
-            expectedEgo = Math.ceil((expectedEndurance + (2 * opponentGirlSum)) * (1 + opponentBonuses.ego) * (1 + egoDominanceBonusAdjustment))
+            const expectedEndurance = estimateUnboostedEnduranceForLevel(opponentLvl, opponentMonostatCount, opponentHasClub, equipCaracs, opponentClass)
+            expectedEgo = Math.ceil((expectedEndurance + (2 * opponentGirlSum)) * (1 + opponentBonuses.ego) * (1 + egoDominanceBonusAdjustment) * (1 + egoResonanceBonusAdjustment))
         }
         const extraPercent = calculateExtraPercent(expectedEgo, opponentEgo)
 
-        if(LOGS_ENABLED) console.log(`CHLORELLA CHECK: Expected: ${expectedEgo}, Actual: ${opponentEgo}, Extra: ${extraPercent}%`);
+        if (LOGS_ENABLED) console.log(`CHLORELLA CHECK: Expected: ${expectedEgo}, Actual: ${opponentEgo}, Extra: ${extraPercent}%`);
         const existingTooltip = $ego.attr('hh_title')
         const newTooltip = buildResultTooltip(existingTooltip, ['ego'], expectedEgo, opponentEgo, extraPercent)
         $ego.attr('hh_title', newTooltip)
@@ -424,22 +505,21 @@ function boosterModule () {
             }
             $ego.addClass(boosted)
             $egoMobile.addClass(boosted)
-            addIcon('chlor')
         }
     }
 
-    function checkCordyceps () {
+    function checkCordyceps() {
         let expectedAttack
         if (!isEstimate) {
             const expectedUnrounded = opponentMainStat + (0.25 * opponentGirlSum)
-            expectedAttack = Math.ceil(expectedUnrounded)
+            expectedAttack = Math.ceil(expectedUnrounded * (1 + opponentBonuses.attack) * (1 + attackDominanceBonusAdjustment) * (1 + attackResonanceBonusAdjustment))
         } else {
-            const expectedMainStat = estimateUnboostedPrimaryStatForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
-            expectedAttack = Math.ceil((expectedMainStat + (0.25 * opponentGirlSum)) * (1 + opponentBonuses.attack) * (1 + attackDominanceBonusAdjustment))
+            const expectedMainStat = estimateUnboostedPrimaryStatForLevel(opponentLvl, opponentMonostatCount, opponentHasClub, equipCaracs, opponentClass)
+            expectedAttack = Math.ceil((expectedMainStat + (0.25 * opponentGirlSum)) * (1 + opponentBonuses.attack) * (1 + attackDominanceBonusAdjustment) * (1 + attackResonanceBonusAdjustment))
         }
         const extraPercent = calculateExtraPercent(expectedAttack, opponentAtk)
 
-        if(LOGS_ENABLED) console.log(`CORDYCEPS CHECK: Expected: ${expectedAttack}, Actual: ${opponentAtk}, Extra: ${extraPercent}%`);
+        if (LOGS_ENABLED) console.log(`CORDYCEPS CHECK: Expected: ${expectedAttack}, Actual: ${opponentAtk}, Extra: ${extraPercent}%`);
         const existingTooltip = $attack.attr('hh_title')
         const newTooltip = buildResultTooltip(existingTooltip, ['damage'], expectedAttack, opponentAtk, extraPercent)
         $attack.attr('hh_title', newTooltip)
@@ -451,25 +531,24 @@ function boosterModule () {
             }
             $attack.addClass(boosted)
             $attackMobile.addClass(boosted)
-            addIcon('cordy')
         }
     }
 
-    function checkGinseng () {
+    function checkGinseng() {
         let expectedMainStat
         let expectedNonMainStatSum
         let extraPercent
         if (!isEstimate) {
-            expectedMainStat = estimateUnboostedPrimaryStatForLevel(opponentLvl, opponentMonostatCount, opponentHasClub)
+            expectedMainStat = estimateUnboostedPrimaryStatForLevel(opponentLvl, opponentMonostatCount, opponentHasClub, equipCaracs, opponentClass)
             extraPercent = calculateExtraPercent(expectedMainStat, opponentMainStat)
         } else {
-            expectedNonMainStatSum = opponentLvl * (SECONDARY_PER_LEVEL + TERTIARY_PER_LEVEL + 2*RAINBOW_STAT_PER_LEVEL*(6-opponentMonostatCount))
+            expectedNonMainStatSum = opponentLvl * (SECONDARY_PER_LEVEL + TERTIARY_PER_LEVEL + 2 * RAINBOW_STAT_PER_LEVEL * (6 - opponentMonostatCount))
             extraPercent = Math.round(
                 ((opponentNonMainStatSum / expectedNonMainStatSum) - getClubBonus(opponentHasClub)) * 100
             )
         }
 
-        if(LOGS_ENABLED) console.log(`GINSENG CHECK: Expected: ${isEstimate ? expectedNonMainStatSum : expectedMainStat}, Actual: ${isEstimate ? opponentNonMainStatSum : opponentMainStat}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
+        if (LOGS_ENABLED) console.log(`GINSENG CHECK: Expected: ${isEstimate ? expectedNonMainStatSum : expectedMainStat}, Actual: ${isEstimate ? opponentNonMainStatSum : opponentMainStat}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
         const existingTooltip = $defense.attr('hh_title')
         const newTooltip = buildResultTooltip(
             existingTooltip,
@@ -486,18 +565,17 @@ function boosterModule () {
             }
             $defense.addClass(boosted)
             $defenseMobile.addClass(boosted)
-            addIcon('ginseng')
         }
     }
 
-    function checkJujubes () {
+    function checkJujubes() {
         const clubBonus = getClubBonus(opponentHasClub)
 
-        const expectedUnrounded = ((opponentNonMainStatSum * 0.5 * clubBonus) + ((6 - opponentMonostatCount) * Math.ceil(RAINBOW_HARM_BASE + (opponentLvl * RAINBOW_HARM_PER_LEVEL)))) * (1 + opponentBonuses.harmony)
+        const expectedUnrounded = ((opponentNonMainStatSum * 0.5 * clubBonus) + equipCaracs.chance) * (1 + opponentBonuses.harmony) * (1 + harmonyResonanceBonusAdjustment)
         const expectedHarmony = Math.ceil(expectedUnrounded)
         const extraPercent = calculateExtraPercent(expectedHarmony, opponentHarmony)
 
-        if(LOGS_ENABLED) console.log(`JUJUBES CHECK: Expected: ${expectedHarmony}, Actual: ${opponentHarmony}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
+        if (LOGS_ENABLED) console.log(`JUJUBES CHECK: Expected: ${expectedHarmony}, Actual: ${opponentHarmony}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
         const existingTooltip = $harmony.attr('hh_title')
         const newTooltip = buildResultTooltip(existingTooltip, ['chance'], expectedHarmony, opponentHarmony, extraPercent)
         $harmony.attr('hh_title', newTooltip)
@@ -509,30 +587,11 @@ function boosterModule () {
             }
             $harmony.addClass(boosted)
             $harmonyMobile.addClass(boosted)
-            addIcon('jujubes')
         }
     }
 
-    function setupIconHolder () {
-        let iconHolder = $('.leadTable .lead_table_default .booster_icons')
-
-        if (!iconHolder.length) {
-            iconHolder = $('<span class="booster_icons"></span>')
-            $('.leadTable .lead_table_default .nickname').append(iconHolder)
-        }
-
-        iconHolder.empty()
-    }
-
-    function addIcon (type) {
-        if(!isEstimate) {
-            $('.leadTable .lead_table_default .booster_icons').append(`<span class="booster_icon boosted_${type}"></span>`)
-        }
-    }
-
-    function checkBoosters () {
-        setupIconHolder()
-        getStats()
+    async function checkBoosters() {
+        await getStats()
 
         checkCordyceps()
         checkChlorella()
@@ -543,11 +602,11 @@ function boosterModule () {
 
     // Observer grabbed from HH++
     let opntName;
-    $('.leadTable').click(function() {
-        opntName=''
+    $('.leadTable').click(function () {
+        opntName = ''
     })
     function waitOpnt() {
-        setTimeout(function() {
+        setTimeout(function () {
             if ($('#leagues_right .team-member > img').data('new-girl-tooltip')) {
                 checkBoosters();
             }
@@ -556,7 +615,7 @@ function boosterModule () {
             }
         }, 50);
     }
-    const observeCallback = function() {
+    const observeCallback = function () {
         const opntNameNew = $('#leagues_right .player_block .title')[0].innerHTML
         if (opntName !== opntNameNew) {
             opntName = opntNameNew;
@@ -565,7 +624,7 @@ function boosterModule () {
     }
     const observer = new MutationObserver(observeCallback);
     const test = document.getElementById('leagues_right');
-    observer.observe(test, {attributes: false, childList: true, subtree: false});
+    observer.observe(test, { attributes: false, childList: true, subtree: false });
 
     sheet.insertRule(`
     #leagues_right .boosted, .selected-player-leagues .boosted {
@@ -577,49 +636,6 @@ function boosterModule () {
     #leagues_right .boosted_light, .selected-player-leagues .boosted_light {
         color: #FFA500;
         text-shadow: rgb(0, 0, 0) 1px 1px 0px, rgb(0, 0, 0) -1px 1px 0px, rgb(0, 0, 0) -1px -1px 0px, rgb(0, 0, 0) 1px -1px 0px;
-    }
-    `);
-    sheet.insertRule(`
-    .leadTable .booster_icons {
-        display: inline-flex;
-        flex: 1;
-        margin: 0 !important;
-        align-items: center;
-        justify-content: flex-end;
-    }
-    `);
-    sheet.insertRule(`
-    .leadTable .booster_icon {
-        background-size: contain;
-        background-position-y: center;
-        background-repeat: no-repeat;
-        height: 20px;
-        max-width: 20px;
-        flex: 1;
-        margin: 0 !important;
-    }
-    `);
-
-    const icons = {
-        ginseng: 'https://hh.hh-content.com/pictures/items/B1.png',
-        jujubes: 'https://hh.hh-content.com/pictures/items/B2.png',
-        chlor: 'https://hh.hh-content.com/pictures/items/B3.png',
-        cordy: 'https://hh.hh-content.com/pictures/items/B4.png'
-    }
-
-    Object.keys(icons).forEach(booster => {
-        sheet.insertRule(`
-        .leadTable .boosted_${booster} {
-            background: url('${icons[booster]}');
-        }
-        `)
-    })
-
-    sheet.insertRule(`
-    .lead_table table tbody tr>td .nickname {
-        display: inline-flex;
-        align-items: center;
-        justify-content: space-between;
     }
     `);
 }

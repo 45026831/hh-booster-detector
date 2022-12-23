@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.2.0
+// @version         0.2.1
 // @match           https://*.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://www.gayharem.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.2.1: Fixing ginseng check in the corner-case where profile stats don't match snapshot
 // 0.2.0: Changing stat collection to work with mythic items
 // 0.1.14: Improving harem endurance bonus calculation now that the game calculates it properly
 // 0.1.13: Taking ego dominance bonus into account now that it's incuded in the opponent's stats
@@ -395,18 +396,18 @@ function boosterModule() {
         harmonyResonanceBonusAdjustment = mythicEquipBonuses.chance
 
         if (!opponentMainStat) {
-            opponentMainStat = Math.ceil(((opponentAtk / (1 + attackDominanceBonusAdjustment)) / (1 + opponentBonuses.attack)) - (opponentGirlSum * 0.25))
+            opponentMainStat = Math.ceil((((opponentAtk / (1 + attackDominanceBonusAdjustment)) / (1 + opponentBonuses.attack)) / (1 + mythicEquipBonuses.damage)) - (opponentGirlSum * 0.25))
             isEstimate = true
         }
 
         if (!opponentScndStat) {
-            opponentNonMainStatSum = (((opponentDef / (1 - ownDefenseReductionAdjustment)) / (1 + opponentBonuses.defense)) - (opponentGirlSum * 0.12)) * 4
+            opponentNonMainStatSum = ((((opponentDef / (1 - ownDefenseReductionAdjustment)) / (1 + opponentBonuses.defense)) / (1 + mythicEquipBonuses.defense)) - (opponentGirlSum * 0.12)) * 4
             isEstimate = true
         } else {
             opponentNonMainStatSum = opponentScndStat + opponentTertStat
         }
         if (!opponentEndurance) {
-            opponentEndurance = Math.ceil(((opponentEgo / 1 + egoDominanceBonusAdjustment) / (1 + opponentBonuses.ego)) - (opponentGirlSum * 2))
+            opponentEndurance = Math.ceil((((opponentEgo / 1 + egoDominanceBonusAdjustment) / (1 + opponentBonuses.ego)) / (1 + mythicEquipBonuses.ego)) - (opponentGirlSum * 2))
             isEstimate = true
         }
 
@@ -542,7 +543,7 @@ function boosterModule() {
             expectedMainStat = estimateUnboostedPrimaryStatForLevel(opponentLvl, opponentMonostatCount, opponentHasClub, equipCaracs, opponentClass)
             extraPercent = calculateExtraPercent(expectedMainStat, opponentMainStat)
         } else {
-            expectedNonMainStatSum = opponentLvl * (SECONDARY_PER_LEVEL + TERTIARY_PER_LEVEL + 2 * RAINBOW_STAT_PER_LEVEL * (6 - opponentMonostatCount))
+            expectedNonMainStatSum = (opponentLvl * (SECONDARY_PER_LEVEL + TERTIARY_PER_LEVEL)) + equipCaracs[`carac${classRelationships[opponentClass].s}`] + equipCaracs[`carac${classRelationships[opponentClass].t}`]
             extraPercent = Math.round(
                 ((opponentNonMainStatSum / expectedNonMainStatSum) - getClubBonus(opponentHasClub)) * 100
             )

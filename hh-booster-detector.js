@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.2.1
+// @version         0.2.2
 // @match           https://*.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://www.gayharem.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.2.2: Adding tooltips on mobile
 // 0.2.1: Fixing ginseng check in the corner-case where profile stats don't match snapshot
 // 0.2.0: Changing stat collection to work with mythic items
 // 0.1.14: Improving harem endurance bonus calculation now that the game calculates it properly
@@ -471,16 +472,24 @@ function boosterModule() {
             existingHarmonyTooltip = GT.chance
         }
 
-        $attack.attr('hh_title',
-            `${existingAttackTooltip}<br/>
+        const attackTooltip = `${existingAttackTooltip}<br/>
             ${isEstimate ? 'Estimate ' : ''}<span carac="class${opponentClass}"/> ${opponentMainStat.toLocaleString(locale)}<br/>
-            Monostat count: ${opponentMonostatCount}`)
-        $defense.attr('hh_title',
-            `${existingDefenceTooltip}<br/>
+            Monostat count: ${opponentMonostatCount}`
+        $attack.attr('tooltip', attackTooltip).removeAttr('hh_title')
+        $attackMobile.attr('tooltip', attackTooltip)
+
+        const defenseTooltip = `${existingDefenceTooltip}<br/>
             ${isEstimate ? 'Estimate ' : ''}<span carac="class${classRelationships[opponentClass].s}"/> ${opponentScndStat.toLocaleString(locale)}<br/>
-            ${isEstimate ? 'Estimate ' : ''}<span carac="class${classRelationships[opponentClass].t}"/> ${opponentTertStat.toLocaleString(locale)}`)
-        $ego.attr('hh_title', `${existingEgoTooltip}<br/>${isEstimate ? 'Estimate ' : ''}<span carac="endurance"/> ${opponentEndurance.toLocaleString(locale)}`)
-        $harmony.attr('hh_title', existingHarmonyTooltip)
+            ${isEstimate ? 'Estimate ' : ''}<span carac="class${classRelationships[opponentClass].t}"/> ${opponentTertStat.toLocaleString(locale)}`
+        $defense.attr('tooltip', defenseTooltip).removeAttr('hh_title')
+        $defenseMobile.attr('tooltip', defenseTooltip)
+
+        const egoTooltip = `${existingEgoTooltip}<br/>${isEstimate ? 'Estimate ' : ''}<span carac="endurance"/> ${opponentEndurance.toLocaleString(locale)}`
+        $ego.attr('tooltip', egoTooltip).removeAttr('hh_title')
+        $egoMobile.attr('tooltip', egoTooltip)
+
+        $harmony.attr('tooltip', existingHarmonyTooltip).removeAttr('hh_title')
+        $harmonyMobile.attr('tooltip', existingHarmonyTooltip)
     }
 
     function checkChlorella() {
@@ -495,9 +504,10 @@ function boosterModule() {
         const extraPercent = calculateExtraPercent(expectedEgo, opponentEgo)
 
         if (LOGS_ENABLED) console.log(`CHLORELLA CHECK: Expected: ${expectedEgo}, Actual: ${opponentEgo}, Extra: ${extraPercent}%`);
-        const existingTooltip = $ego.attr('hh_title')
+        const existingTooltip = $ego.attr('tooltip')
         const newTooltip = buildResultTooltip(existingTooltip, ['ego'], expectedEgo, opponentEgo, extraPercent)
-        $ego.attr('hh_title', newTooltip)
+        $ego.attr('tooltip', newTooltip)
+        $egoMobile.attr('tooltip', newTooltip)
 
         if (extraPercent > 0) {
             let boosted = 'boosted'
@@ -521,9 +531,10 @@ function boosterModule() {
         const extraPercent = calculateExtraPercent(expectedAttack, opponentAtk)
 
         if (LOGS_ENABLED) console.log(`CORDYCEPS CHECK: Expected: ${expectedAttack}, Actual: ${opponentAtk}, Extra: ${extraPercent}%`);
-        const existingTooltip = $attack.attr('hh_title')
+        const existingTooltip = $attack.attr('tooltip')
         const newTooltip = buildResultTooltip(existingTooltip, ['damage'], expectedAttack, opponentAtk, extraPercent)
-        $attack.attr('hh_title', newTooltip)
+        $attack.attr('tooltip', newTooltip)
+        $attackMobile.attr('tooltip', newTooltip)
 
         if (extraPercent > 0) {
             let boosted = 'boosted'
@@ -550,14 +561,15 @@ function boosterModule() {
         }
 
         if (LOGS_ENABLED) console.log(`GINSENG CHECK: Expected: ${isEstimate ? expectedNonMainStatSum : expectedMainStat}, Actual: ${isEstimate ? opponentNonMainStatSum : opponentMainStat}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
-        const existingTooltip = $defense.attr('hh_title')
+        const existingTooltip = $defense.attr('tooltip')
         const newTooltip = buildResultTooltip(
             existingTooltip,
             isEstimate ? [`class${classRelationships[opponentClass].s}`, `class${classRelationships[opponentClass].t}`] : [`class${opponentClass}`],
             isEstimate ? expectedNonMainStatSum * getClubBonus(opponentHasClub) : expectedMainStat,
             isEstimate ? opponentNonMainStatSum : opponentMainStat,
             extraPercent)
-        $defense.attr('hh_title', newTooltip)
+        $defense.attr('tooltip', newTooltip)
+        $defenseMobile.attr('tooltip', newTooltip)
 
         if (extraPercent > 0) {
             let boosted = 'boosted'
@@ -577,9 +589,10 @@ function boosterModule() {
         const extraPercent = calculateExtraPercent(expectedHarmony, opponentHarmony)
 
         if (LOGS_ENABLED) console.log(`JUJUBES CHECK: Expected: ${expectedHarmony}, Actual: ${opponentHarmony}, Extra: ${extraPercent}%, Monostat count: ${opponentMonostatCount}, Has club: ${opponentHasClub}`);
-        const existingTooltip = $harmony.attr('hh_title')
+        const existingTooltip = $harmony.attr('tooltip')
         const newTooltip = buildResultTooltip(existingTooltip, ['chance'], expectedHarmony, opponentHarmony, extraPercent)
-        $harmony.attr('hh_title', newTooltip)
+        $harmony.attr('tooltip', newTooltip)
+        $harmonyMobile.attr('tooltip', newTooltip)
 
         if (extraPercent > 0) {
             let boosted = 'boosted'

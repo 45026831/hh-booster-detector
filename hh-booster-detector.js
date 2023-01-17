@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Hentai Heroes++ League Booster Detector Add-on
 // @description     Adding detection of boosters to league.
-// @version         0.2.2
+// @version         0.2.3
 // @match           https://*.hentaiheroes.com/*
 // @match           https://nutaku.haremheroes.com/*
 // @match           https://www.gayharem.com/*
@@ -19,6 +19,7 @@
 /*  ===========
      CHANGELOG
     =========== */
+// 0.2.3: Adding pending indication while profile data is being loaded
 // 0.2.2: Adding tooltips on mobile
 // 0.2.1: Fixing ginseng check in the corner-case where profile stats don't match snapshot
 // 0.2.0: Changing stat collection to work with mythic items
@@ -72,6 +73,8 @@ const sheet = (function () {
 })()
 
 const currentPage = location.pathname
+
+const profileDataCache = {}
 
 const HC = 1
 const CH = 2
@@ -216,33 +219,38 @@ function calculateDominationBonuses(playerElements, opponentElements) {
 }
 
 async function getEquipDataFromProfile(playerId) {
-    const html = await new Promise((res) => {
-        window.$.ajax({
-            url: `/hero/${playerId}/profile.html`,
-            success: res
+
+    if (!profileDataCache[playerId]) {
+        const html = await new Promise((res) => {
+            window.$.ajax({
+                url: `/hero/${playerId}/profile.html`,
+                success: res
+            })
         })
-    })
+    
+        const $page = $(html)
+    
+        const equips = []
+        const stats = {}
+    
+        $page.find('.hero_items .slot-container .slot').each((i, el) => {
+            const $slot = $(el)
+            const data = $slot.data('d')
+            if (data) {
+                equips.push(data)
+            }
+        })
+    
+        const CARAC_KEYS = ['1', '2', '3', 'endurance', 'chance']
+        CARAC_KEYS.forEach(carac => {
+            const caracVal = $page.find(`.fight_stats [carac=${carac}]`).text()
+            stats[carac] = +caracVal.replace(/[^0-9]/g, '')
+        })
+    
+        profileDataCache[playerId] = { equips, stats }
+    }
 
-    const $page = $(html)
-
-    const equips = []
-    const stats = {}
-
-    $page.find('.hero_items .slot-container .slot').each((i, el) => {
-        const $slot = $(el)
-        const data = $slot.data('d')
-        if (data) {
-            equips.push(data)
-        }
-    })
-
-    const CARAC_KEYS = ['1', '2', '3', 'endurance', 'chance']
-    CARAC_KEYS.forEach(carac => {
-        const caracVal = $page.find(`.fight_stats [carac=${carac}]`).text()
-        stats[carac] = +caracVal.replace(/[^0-9]/g, '')
-    })
-
-    return { equips, stats }
+    return profileDataCache[playerId]
 }
 
 if (currentPage.includes('tower-of-fame')) {
@@ -605,12 +613,15 @@ function boosterModule() {
     }
 
     async function checkBoosters() {
+        const $statsContainer = $('#leagues_right .fighter-stats-container, .selected-player-leagues .caracs-hero')
+        $statsContainer.addClass('booster-detector-pending')
         await getStats()
 
         checkCordyceps()
         checkChlorella()
         checkGinseng()
         checkJujubes()
+        $statsContainer.removeClass('booster-detector-pending')
     }
     checkBoosters()
 
@@ -650,6 +661,11 @@ function boosterModule() {
     #leagues_right .boosted_light, .selected-player-leagues .boosted_light {
         color: #FFA500;
         text-shadow: rgb(0, 0, 0) 1px 1px 0px, rgb(0, 0, 0) -1px 1px 0px, rgb(0, 0, 0) -1px -1px 0px, rgb(0, 0, 0) 1px -1px 0px;
+    }
+    `);
+    sheet.insertRule(`
+    .booster-detector-pending {
+        color: #aaa;
     }
     `);
 }
